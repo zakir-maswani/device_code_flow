@@ -8,7 +8,7 @@ from msal import PublicClientApplication
 CLIENT_ID = st.secrets["CLIENT_ID"]
 TENANT_ID = st.secrets["TENANT_ID"]
 
-AUTHORITY = "https://login.microsoftonline.com/common"
+AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 SCOPES = ["Mail.Read", "User.Read"]
 
 # ----------------------------
