@@ -37,7 +37,7 @@ def get_emails(access_token, top=10):
     url = (
         #"https://graph.microsoft.com/v1.0/me/messages"
         #f"?$top={top}&$select=subject,from,receivedDateTime,bodyPreview"
-        "https://graph.microsoft.com/v1.0/me/messages?%24top=5&24skip=5"
+        f"https://graph.microsoft.com/v1.0/me/messages?$top={top}&$skip=0"
     )
 
     headers = {
