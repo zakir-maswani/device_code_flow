@@ -27,8 +27,10 @@ def get_access_token():
 
     if "user_code" not in flow:
         return None, "Device flow failed"
+    st.write(flow)  
 
     return flow, None
+    
 
 
 def get_emails(access_token, top=10):
