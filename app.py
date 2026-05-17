@@ -9,7 +9,7 @@ CLIENT_ID = st.secrets["CLIENT_ID"]
 TENANT_ID = st.secrets["TENANT_ID"]
 
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
-SCOPES = ["Mail.Read", "User.Read"]
+SCOPES = ["Mail.Read"]
 
 # ----------------------------
 # MSAL App
@@ -34,7 +34,7 @@ def get_access_token():
 
 
 def get_emails(access_token, top=10):
-    url = f"https://graph.microsoft.com/v1.0/me/messages?$top={top}"
+    url = "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=5"
 
     headers = {
         "Authorization": f"Bearer {access_token}",
