@@ -72,12 +72,6 @@ if "access_token" not in st.session_state:
             st.success("✅ Logged in!")
             token = st.session_state["access_token"]
             st.rerun()
-            decoded = jwt.decode(token, options={"verify_signature": False})
-
-            st.write("**aud:**", decoded.get("aud"))       # must be "https://graph.microsoft.com"
-            st.write("**scp:**", decoded.get("scp"))       # must include "Mail.Read"
-            st.write("**idp:**", decoded.get("idp"))       # "live.com" = personal account
-            st.write("**exp:**", decoded.get("exp"))       # check it's not expired
             
         else:
             err = result.get("error_description", "Unknown error")
@@ -88,6 +82,12 @@ if "access_token" not in st.session_state:
 # ----------------------------
 else:
     st.success("🎉 You are logged in!")
+    decoded = jwt.decode(token, options={"verify_signature": False})
+
+    st.write("**aud:**", decoded.get("aud"))       # must be "https://graph.microsoft.com"
+    st.write("**scp:**", decoded.get("scp"))       # must include "Mail.Read"
+    st.write("**idp:**", decoded.get("idp"))       # "live.com" = personal account
+    st.write("**exp:**", decoded.get("exp"))       # check it's not expired
 
     col1, col2 = st.columns(2)
     with col1:
