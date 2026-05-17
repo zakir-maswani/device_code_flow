@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 from msal import PublicClientApplication
+import jwt
 
 # ----------------------------
 # Config
@@ -69,7 +70,15 @@ if "access_token" not in st.session_state:
         if "access_token" in result:
             st.session_state["access_token"] = result["access_token"]
             st.success("✅ Logged in!")
+            token = st.session_state["access_token"]
+            decoded = jwt.decode(token, options={"verify_signature": False})
+
+            st.write("**aud:**", decoded.get("aud"))       # must be "https://graph.microsoft.com"
+            st.write("**scp:**", decoded.get("scp"))       # must include "Mail.Read"
+            st.write("**idp:**", decoded.get("idp"))       # "live.com" = personal account
+            st.write("**exp:**", decoded.get("exp"))       # check it's not expired
             st.rerun()
+            
         else:
             err = result.get("error_description", "Unknown error")
             st.error(f"Login failed: {err}")
