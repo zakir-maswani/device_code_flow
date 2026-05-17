@@ -59,7 +59,6 @@ if "access_token" not in st.session_state:
                 st.error("Device flow failed. Check your Azure app registration.")
                 st.stop()
 
-        # Show the code to the user clearly
         st.markdown("### 👇 Complete login in your browser")
         st.code(flow["user_code"], language=None)
         st.markdown(f"Go to **[microsoft.com/devicelogin]({flow['verification_uri']})** and enter the code above.")
@@ -70,9 +69,7 @@ if "access_token" not in st.session_state:
         if "access_token" in result:
             st.session_state["access_token"] = result["access_token"]
             st.success("✅ Logged in!")
-            token = st.session_state["access_token"]
             st.rerun()
-            
         else:
             err = result.get("error_description", "Unknown error")
             st.error(f"Login failed: {err}")
@@ -82,18 +79,30 @@ if "access_token" not in st.session_state:
 # ----------------------------
 else:
     st.success("🎉 You are logged in!")
-    decoded = jwt.decode(access_token, options={"verify_signature": False})
 
-    st.write("**aud:**", decoded.get("aud"))       # must be "https://graph.microsoft.com"
-    st.write("**scp:**", decoded.get("scp"))       # must include "Mail.Read"
-    st.write("**idp:**", decoded.get("idp"))       # "live.com" = personal account
-    st.write("**exp:**", decoded.get("exp"))       # check it's not expired
+    token = st.session_state["access_token"]
 
+    # ----------------------------
+    # DEBUG: Decode & display token claims
+    # ----------------------------
+    try:
+        decoded = jwt.decode(token, options={"verify_signature": False})
+        with st.expander("🔍 Token Debug Info"):
+            st.write("**aud:**", decoded.get("aud"))   # must be https://graph.microsoft.com
+            st.write("**scp:**", decoded.get("scp"))   # must include Mail.Read
+            st.write("**idp:**", decoded.get("idp"))   # live.com = personal account
+            st.write("**exp:**", decoded.get("exp"))   # expiry timestamp
+    except Exception as e:
+        st.warning(f"Could not decode token: {e}")
+
+    # ----------------------------
+    # ACTIONS
+    # ----------------------------
     col1, col2 = st.columns(2)
     with col1:
         if st.button("📥 Fetch Emails"):
             with st.spinner("Fetching emails..."):
-                st.session_state["emails"] = get_emails(st.session_state["access_token"])
+                st.session_state["emails"] = get_emails(token)
     with col2:
         if st.button("🚪 Logout"):
             for key in ["access_token", "emails"]:
@@ -101,7 +110,7 @@ else:
             st.rerun()
 
     # ----------------------------
-    # DISPLAY
+    # DISPLAY EMAILS
     # ----------------------------
     if "emails" in st.session_state:
         emails = st.session_state["emails"]
