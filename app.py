@@ -6,7 +6,9 @@ from msal import PublicClientApplication
 # Config
 # ----------------------------
 CLIENT_ID = st.secrets["CLIENT_ID"]
-AUTHORITY = "https://login.microsoftonline.com/consumers"  # personal accounts
+TENANT_ID = st.secrets["TENANT_ID"]
+
+AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 SCOPES = ["Mail.Read"]
 
 app = PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
