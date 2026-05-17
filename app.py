@@ -34,24 +34,24 @@ def get_access_token():
 
 
 def get_emails(access_token, top=10):
-    url = (
-        #"https://graph.microsoft.com/v1.0/me/messages"
-        #f"?$top={top}&$select=subject,from,receivedDateTime,bodyPreview"
-        f"https://graph.microsoft.com/v1.0/me/messages?$top={top}&$skip=0"
-    )
+    url = f"https://graph.microsoft.com/v1.0/me/messages?$top={top}"
 
     headers = {
-        "Authorization": f"Bearer {access_token}"
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
     }
 
     response = requests.get(url, headers=headers)
 
+    st.write("Status Code:", response.status_code)   # DEBUG
+    st.write("Response:", response.text[:500])       # DEBUG
+
     if response.status_code == 200:
-        return response.json().get("value", [])
+        data = response.json()
+        return data.get("value", [])
     else:
         st.error(response.text)
         return []
-
 
 # ----------------------------
 # UI
