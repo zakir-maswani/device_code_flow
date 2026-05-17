@@ -82,7 +82,7 @@ if "access_token" not in st.session_state:
 # ----------------------------
 else:
     st.success("🎉 You are logged in!")
-    decoded = jwt.decode(token, options={"verify_signature": False})
+    decoded = jwt.decode(access_token, options={"verify_signature": False})
 
     st.write("**aud:**", decoded.get("aud"))       # must be "https://graph.microsoft.com"
     st.write("**scp:**", decoded.get("scp"))       # must include "Mail.Read"
