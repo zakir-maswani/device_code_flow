@@ -18,15 +18,21 @@ app = PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
 # Functions
 # ----------------------------
 def get_emails(access_token):
-    url = "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=10"
+    # ✅ Option 1: Just /me/messages (works for all account types)
+    url = "https://graph.microsoft.com/v1.0/me/messages?$top=10&$orderby=receivedDateTime desc"
+    
     headers = {"Authorization": f"Bearer {access_token}"}
     response = requests.get(url, headers=headers)
+    
+    st.write("Status:", response.status_code)  # keep this for now
+    
     if response.status_code == 200:
         return response.json().get("value", [])
     else:
         st.error(f"Error {response.status_code}: {response.text}")
+        st.json(response.json())
         return []
-
+        
 def try_silent_login():
     """Reuse cached token if available (avoids re-login on rerun)."""
     accounts = app.get_accounts()
