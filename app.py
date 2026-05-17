@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-from msal import PublicClientApplication
+from msal import PublicClientApplication, SerializableTokenCache
 from datetime import datetime
 
 # ─────────────────────────────────────────────
@@ -18,154 +18,51 @@ st.set_page_config(
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
-    /* ── Global ── */
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+    html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
 
-    html, body, [class*="css"] {
-        font-family: 'DM Sans', sans-serif;
-    }
+    section[data-testid="stSidebar"] { background: #0f1117; border-right: 1px solid #1e2130; }
+    section[data-testid="stSidebar"] * { color: #c9d1e0 !important; }
 
-    /* ── Sidebar ── */
-    section[data-testid="stSidebar"] {
-        background: #0f1117;
-        border-right: 1px solid #1e2130;
-    }
-    section[data-testid="stSidebar"] * {
-        color: #c9d1e0 !important;
-    }
-
-    /* ── Email card ── */
     .email-card {
-        background: #16192a;
-        border: 1px solid #1e2540;
-        border-radius: 12px;
-        padding: 18px 22px;
-        margin-bottom: 12px;
-        transition: border-color 0.2s, box-shadow 0.2s;
-        position: relative;
+        background: #16192a; border: 1px solid #1e2540; border-radius: 12px;
+        padding: 18px 22px; margin-bottom: 12px;
+        transition: border-color 0.2s, box-shadow 0.2s; position: relative;
     }
-    .email-card:hover {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 1px #3b82f620;
-    }
-    .email-card.unread {
-        border-left: 3px solid #3b82f6;
-        background: #141829;
-    }
-    .email-card.urgent {
-        border-left: 3px solid #ef4444;
-    }
+    .email-card:hover { border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f620; }
+    .email-card.unread { border-left: 3px solid #3b82f6; background: #141829; }
+    .email-card.urgent { border-left: 3px solid #ef4444; }
 
-    /* ── Subject line ── */
-    .email-subject {
-        font-size: 15px;
-        font-weight: 600;
-        color: #e8eaf0;
-        margin: 0 0 4px 0;
-        line-height: 1.4;
-    }
-    .email-subject.read {
-        font-weight: 400;
-        color: #8b92a5;
-    }
+    .email-subject { font-size: 15px; font-weight: 600; color: #e8eaf0; margin: 0 0 4px 0; line-height: 1.4; }
+    .email-subject.read { font-weight: 400; color: #8b92a5; }
 
-    /* ── Meta row ── */
     .email-meta {
-        display: flex;
-        gap: 16px;
-        font-size: 12px;
-        color: #5a6478;
-        font-family: 'DM Mono', monospace;
-        margin-bottom: 10px;
-        flex-wrap: wrap;
+        display: flex; gap: 16px; font-size: 12px; color: #5a6478;
+        font-family: 'DM Mono', monospace; margin-bottom: 10px; flex-wrap: wrap;
     }
-    .email-meta span { display: flex; align-items: center; gap: 4px; }
-
-    /* ── Preview ── */
     .email-preview {
-        font-size: 13px;
-        color: #6b7485;
-        line-height: 1.6;
-        border-top: 1px solid #1e2540;
-        padding-top: 10px;
-        margin-top: 6px;
+        font-size: 13px; color: #6b7485; line-height: 1.6;
+        border-top: 1px solid #1e2540; padding-top: 10px; margin-top: 6px;
     }
 
-    /* ── Badges ── */
-    .badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 20px;
-        font-size: 11px;
-        font-weight: 500;
-        font-family: 'DM Mono', monospace;
-    }
-    .badge-unread  { background: #1e3a5f; color: #60a5fa; }
-    .badge-urgent  { background: #3b1010; color: #f87171; }
-    .badge-attach  { background: #1a2e1a; color: #4ade80; }
-    .badge-read    { background: #1a1f2e; color: #4b5563; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; font-family: 'DM Mono', monospace; }
+    .badge-unread { background: #1e3a5f; color: #60a5fa; }
+    .badge-urgent { background: #3b1010; color: #f87171; }
+    .badge-attach { background: #1a2e1a; color: #4ade80; }
 
-    /* ── Open link ── */
-    .open-link a {
-        font-size: 12px;
-        color: #3b82f6 !important;
-        text-decoration: none;
-        font-family: 'DM Mono', monospace;
-    }
+    .open-link a { font-size: 12px; color: #3b82f6 !important; text-decoration: none; font-family: 'DM Mono', monospace; }
     .open-link a:hover { text-decoration: underline; }
 
-    /* ── Stats cards ── */
-    .stat-card {
-        background: #16192a;
-        border: 1px solid #1e2540;
-        border-radius: 10px;
-        padding: 16px 20px;
-        text-align: center;
-    }
+    .stat-card { background: #16192a; border: 1px solid #1e2540; border-radius: 10px; padding: 16px 20px; text-align: center; }
     .stat-number { font-size: 28px; font-weight: 600; color: #e8eaf0; }
     .stat-label  { font-size: 12px; color: #5a6478; margin-top: 2px; font-family: 'DM Mono', monospace; }
 
-    /* ── Login page ── */
-    .login-box {
-        max-width: 420px;
-        margin: 80px auto;
-        background: #16192a;
-        border: 1px solid #1e2540;
-        border-radius: 16px;
-        padding: 48px 40px;
-        text-align: center;
-    }
-    .login-title {
-        font-size: 26px;
-        font-weight: 600;
-        color: #e8eaf0;
-        margin-bottom: 8px;
-    }
-    .login-sub {
-        font-size: 14px;
-        color: #5a6478;
-        margin-bottom: 32px;
-    }
-
-    /* ── Streamlit overrides ── */
     .stButton > button {
-        background: #2563eb;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 20px;
-        font-family: 'DM Sans', sans-serif;
-        font-weight: 500;
-        transition: background 0.2s;
+        background: #2563eb; color: white; border: none; border-radius: 8px;
+        padding: 10px 20px; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: background 0.2s;
     }
     .stButton > button:hover { background: #1d4ed8; color: white; }
 
-    div[data-testid="stSelectbox"] label,
-    div[data-testid="stNumberInput"] label { color: #8b92a5 !important; font-size: 13px; }
-
-    .stSelectbox > div > div { background: #16192a; border-color: #1e2540; color: #c9d1e0; }
-
-    /* Hide default streamlit header clutter */
     #MainMenu { visibility: hidden; }
     footer     { visibility: hidden; }
     header     { visibility: hidden; }
@@ -180,7 +77,50 @@ TENANT_ID = st.secrets["TENANT_ID"]
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 SCOPES    = ["Mail.Read", "User.Read"]
 
-app = PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
+# ─────────────────────────────────────────────
+# MSAL — persistent token cache in session
+# ─────────────────────────────────────────────
+def get_msal_app():
+    """Build MSAL app using a serializable cache stored in session_state."""
+    cache = SerializableTokenCache()
+    if "token_cache" in st.session_state:
+        cache.deserialize(st.session_state["token_cache"])
+
+    msal_app = PublicClientApplication(
+        CLIENT_ID,
+        authority=AUTHORITY,
+        token_cache=cache,
+    )
+    return msal_app, cache
+
+
+def save_cache(cache):
+    """Persist cache back to session_state after any token operation."""
+    if cache.has_state_changed:
+        st.session_state["token_cache"] = cache.serialize()
+
+
+def get_valid_token():
+    """
+    Return a fresh access token.
+    1. Try silent acquire (uses refresh token automatically).
+    2. If that fails, clear session and ask user to re-login.
+    """
+    msal_app, cache = get_msal_app()
+    accounts = msal_app.get_accounts()
+
+    if accounts:
+        result = msal_app.acquire_token_silent(SCOPES, account=accounts[0])
+        save_cache(cache)
+        if result and "access_token" in result:
+            # Update stored token
+            st.session_state["access_token"] = result["access_token"]
+            return result["access_token"], None
+
+    # Silent failed — force re-login
+    for k in ["access_token", "user_info", "emails", "stats", "next_link"]:
+        st.session_state.pop(k, None)
+    return None, "Session expired. Please sign in again."
 
 # ─────────────────────────────────────────────
 # HELPERS
@@ -212,18 +152,28 @@ def get_emails(token, top=10, folder="all", search="", only_unread=False):
     if search:
         url += f"&$search=\"{search}\""
 
-    r = requests.get(url, headers={
+    headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
-        # $search requires ConsistencyLevel header
         **({"ConsistencyLevel": "eventual"} if search else {})
-    })
+    }
+    r = requests.get(url, headers=headers)
 
     if r.status_code == 200:
         data = r.json()
         return data.get("value", []), data.get("@odata.nextLink"), None
     elif r.status_code == 401:
-        return [], None, "401: Token expired — please logout and login again."
+        # Token invalid — try silent refresh then retry once
+        new_token, err = get_valid_token()
+        if err:
+            return [], None, err
+        # Retry with fresh token
+        headers["Authorization"] = f"Bearer {new_token}"
+        r2 = requests.get(url, headers=headers)
+        if r2.status_code == 200:
+            data = r2.json()
+            return data.get("value", []), data.get("@odata.nextLink"), None
+        return [], None, f"Error {r2.status_code}: {r2.text}"
     elif r.status_code == 403:
         return [], None, "403: Mail.Read permission not granted."
     else:
@@ -238,17 +188,13 @@ def format_date(dt_str):
     if not dt_str:
         return ""
     try:
-        dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+        dt  = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
         now = datetime.now(dt.tzinfo)
         diff = now - dt
-        if diff.days == 0:
-            return dt.strftime("Today %I:%M %p")
-        elif diff.days == 1:
-            return dt.strftime("Yesterday %I:%M %p")
-        elif diff.days < 7:
-            return dt.strftime("%A %I:%M %p")
-        else:
-            return dt.strftime("%b %d, %Y")
+        if diff.days == 0:   return dt.strftime("Today %I:%M %p")
+        if diff.days == 1:   return dt.strftime("Yesterday %I:%M %p")
+        if diff.days < 7:    return dt.strftime("%A %I:%M %p")
+        return dt.strftime("%b %d, %Y")
     except Exception:
         return dt_str[:10]
 
@@ -265,25 +211,16 @@ def render_email_card(email):
     web_link    = email.get("webLink", "")
     importance  = email.get("importance", "normal")
 
-    card_class  = "email-card"
-    if not is_read:
-        card_class += " unread"
-    if importance == "high":
-        card_class += " urgent"
-
-    subj_class  = "email-subject" + ("" if not is_read else " read")
+    card_class = "email-card" + (" unread" if not is_read else "") + (" urgent" if importance == "high" else "")
+    subj_class = "email-subject" + ("" if not is_read else " read")
     display_name = sender_name if sender_name else sender_addr
 
     badges = ""
-    if not is_read:
-        badges += '<span class="badge badge-unread">● UNREAD</span> '
-    if importance == "high":
-        badges += '<span class="badge badge-urgent">↑ URGENT</span> '
-    if has_attach:
-        badges += '<span class="badge badge-attach">⊕ ATTACHMENT</span> '
+    if not is_read:          badges += '<span class="badge badge-unread">● UNREAD</span> '
+    if importance == "high": badges += '<span class="badge badge-urgent">↑ URGENT</span> '
+    if has_attach:           badges += '<span class="badge badge-attach">⊕ ATTACHMENT</span> '
 
-    open_btn = f'<div class="open-link"><a href="{web_link}" target="_blank">Open in Outlook ↗</a></div>' if web_link else ""
-
+    open_btn     = f'<div class="open-link"><a href="{web_link}" target="_blank">Open in Outlook ↗</a></div>' if web_link else ""
     preview_html = f'<div class="email-preview">{preview[:300]}{"…" if len(preview) > 300 else ""}</div>' if preview else ""
 
     st.markdown(f"""
@@ -310,17 +247,21 @@ def render_email_card(email):
 # ─────────────────────────────────────────────
 if "access_token" not in st.session_state:
     st.markdown("""
-    <div class="login-box">
+    <div style="max-width:420px; margin:80px auto; background:#16192a; border:1px solid #1e2540;
+                border-radius:16px; padding:48px 40px; text-align:center;">
         <div style="font-size:48px; margin-bottom:16px;">📧</div>
-        <div class="login-title">Outlook Mail</div>
-        <div class="login-sub">Sign in with your Microsoft account to access your inbox</div>
+        <div style="font-size:26px; font-weight:600; color:#e8eaf0; margin-bottom:8px;">Outlook Mail</div>
+        <div style="font-size:14px; color:#5a6478; margin-bottom:32px;">
+            Sign in with your Microsoft account to access your inbox
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
     col = st.columns([1, 2, 1])[1]
     with col:
         if st.button("🔐  Sign in with Microsoft", use_container_width=True):
-            flow = app.initiate_device_flow(scopes=SCOPES)
+            msal_app, cache = get_msal_app()
+            flow = msal_app.initiate_device_flow(scopes=SCOPES)
             if "user_code" not in flow:
                 st.error("Device flow failed. Check your Azure App Registration.")
                 st.stop()
@@ -328,26 +269,33 @@ if "access_token" not in st.session_state:
             st.info("**Step 1** — Copy this code:")
             st.code(flow["user_code"], language=None)
             st.markdown(f"**Step 2** — [Open Microsoft sign-in page ↗]({flow['verification_uri']})")
-            st.caption("Complete sign-in in the browser window, then wait here.")
+            st.caption("Complete sign-in in the browser, then wait here.")
 
             with st.spinner("Waiting for authentication…"):
-                result = app.acquire_token_by_device_flow(flow)
+                result = msal_app.acquire_token_by_device_flow(flow)
+
+            save_cache(cache)
 
             if "access_token" in result:
-                st.session_state["access_token"]  = result["access_token"]
-                st.session_state["token_scopes"]  = result.get("scope", "")
+                st.session_state["access_token"] = result["access_token"]
                 st.success("✅ Signed in successfully!")
                 st.rerun()
             else:
                 st.error(f"Sign-in failed: {result.get('error_description', 'Unknown error')}")
 
 # ─────────────────────────────────────────────
-# MAIN APP (after login)
+# MAIN APP
 # ─────────────────────────────────────────────
 else:
-    # ── Fetch user info once ──────────────────
+    # ── Ensure token is still valid on every page load ──
+    token, err = get_valid_token()
+    if err:
+        st.warning(err)
+        st.stop()
+
+    # ── Fetch user info once ──
     if "user_info" not in st.session_state:
-        user, err = get_user_info(st.session_state["access_token"])
+        user, err = get_user_info(token)
         if user:
             st.session_state["user_info"] = user
         else:
@@ -359,10 +307,10 @@ else:
     display_name = user.get("displayName", "User")
     email_addr   = user.get("mail") or user.get("userPrincipalName", "")
 
-    # ── SIDEBAR ───────────────────────────────
+    # ── SIDEBAR ──
     with st.sidebar:
         st.markdown(f"""
-        <div style="padding: 16px 0 24px;">
+        <div style="padding:16px 0 24px;">
             <div style="font-size:13px; color:#5a6478; margin-bottom:4px;">Signed in as</div>
             <div style="font-size:15px; font-weight:600; color:#e8eaf0;">{display_name}</div>
             <div style="font-size:12px; color:#3b82f6; font-family:'DM Mono',monospace;">{email_addr}</div>
@@ -372,8 +320,7 @@ else:
         st.divider()
 
         st.markdown("**📁 Folder**")
-        folder = st.selectbox(
-            "folder", label_visibility="collapsed",
+        folder = st.selectbox("folder", label_visibility="collapsed",
             options=["all", "inbox", "sent", "drafts", "junk"],
             format_func=lambda x: {
                 "all":    "📬  All Messages",
@@ -399,19 +346,23 @@ else:
 
         st.divider()
         if st.button("🚪  Logout", use_container_width=True):
-            for k in ["access_token", "emails", "user_info", "token_scopes", "next_link", "stats"]:
+            for k in ["access_token", "token_cache", "emails", "user_info",
+                      "stats", "next_link", "folder"]:
                 st.session_state.pop(k, None)
             st.rerun()
 
-    # ── FETCH ─────────────────────────────────
+    # ── FETCH ──
     if fetch_btn:
+        # Always get a fresh/valid token before fetching
+        token, err = get_valid_token()
+        if err:
+            st.error(err)
+            st.stop()
+
         with st.spinner("Fetching emails…"):
             emails, next_link, err = get_emails(
-                st.session_state["access_token"],
-                top=top_n,
-                folder=folder,
-                search=search_query,
-                only_unread=only_unread,
+                token, top=top_n, folder=folder,
+                search=search_query, only_unread=only_unread,
             )
         if err:
             st.error(err)
@@ -419,15 +370,14 @@ else:
             st.session_state["emails"]    = emails
             st.session_state["next_link"] = next_link
             st.session_state["folder"]    = folder
-            # Compute stats
             st.session_state["stats"] = {
-                "total":   len(emails),
-                "unread":  sum(1 for e in emails if not e.get("isRead", True)),
-                "urgent":  sum(1 for e in emails if e.get("importance") == "high"),
-                "attach":  sum(1 for e in emails if e.get("hasAttachments", False)),
+                "total":  len(emails),
+                "unread": sum(1 for e in emails if not e.get("isRead", True)),
+                "urgent": sum(1 for e in emails if e.get("importance") == "high"),
+                "attach": sum(1 for e in emails if e.get("hasAttachments", False)),
             }
 
-    # ── MAIN AREA ─────────────────────────────
+    # ── HEADER ──
     st.markdown(f"""
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:24px;">
         <span style="font-size:28px;">📧</span>
@@ -438,15 +388,15 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Stats row ─────────────────────────────
+    # ── STATS ──
     if "stats" in st.session_state:
         s = st.session_state["stats"]
         c1, c2, c3, c4 = st.columns(4)
         for col, num, label, color in [
-            (c1, s["total"],  "TOTAL",      "#3b82f6"),
-            (c2, s["unread"], "UNREAD",     "#60a5fa"),
-            (c3, s["urgent"], "URGENT",     "#ef4444"),
-            (c4, s["attach"], "W/ ATTACH",  "#4ade80"),
+            (c1, s["total"],  "TOTAL",     "#3b82f6"),
+            (c2, s["unread"], "UNREAD",    "#60a5fa"),
+            (c3, s["urgent"], "URGENT",    "#ef4444"),
+            (c4, s["attach"], "W/ ATTACH", "#4ade80"),
         ]:
             with col:
                 st.markdown(f"""
@@ -457,26 +407,25 @@ else:
                 """, unsafe_allow_html=True)
         st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
 
-    # ── Email list ────────────────────────────
+    # ── EMAIL LIST ──
     if "emails" not in st.session_state:
         st.markdown("""
         <div style="text-align:center; padding:80px 0; color:#3a4155;">
             <div style="font-size:48px; margin-bottom:16px;">📭</div>
-            <div style="font-size:16px;">Select a folder and click <b>Fetch Emails</b> to load your mail</div>
+            <div style="font-size:16px;">Select a folder and click <b>Fetch Emails</b></div>
         </div>
         """, unsafe_allow_html=True)
     else:
         emails = st.session_state["emails"]
-        folder_label = st.session_state.get("folder", "all")
-
         if not emails:
             st.markdown("""
             <div style="text-align:center; padding:60px 0; color:#3a4155;">
                 <div style="font-size:40px; margin-bottom:12px;">📭</div>
-                <div style="font-size:15px;">No emails found in this folder.</div>
+                <div style="font-size:15px;">No emails found.</div>
             </div>
             """, unsafe_allow_html=True)
         else:
+            folder_label = st.session_state.get("folder", "all")
             st.markdown(
                 f'<div style="font-size:13px; color:#5a6478; font-family:\'DM Mono\',monospace; '
                 f'margin-bottom:16px;">{len(emails)} email(s) · {folder_label.upper()}</div>',
@@ -486,10 +435,4 @@ else:
                 render_email_card(email)
 
             if st.session_state.get("next_link"):
-                st.markdown(
-                    '<div style="text-align:center; padding:16px 0; color:#3a4155; font-size:13px;">'
-                    'More emails available — increase the count to load more.'
-                    '</div>',
-                    unsafe_allow_html=True
-                )
-
+                st.caption("More emails available — increase the count to load more.")
