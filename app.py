@@ -1,123 +1,495 @@
 import streamlit as st
 import requests
 from msal import PublicClientApplication
+from datetime import datetime
 
-# ----------------------------
-# Load secrets (Streamlit Cloud)
-# ----------------------------
-CLIENT_ID = st.secrets["CLIENT_ID"]
-TENANT_ID = st.secrets["TENANT_ID"]
-
-AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
-SCOPES = ["Mail.Read", "User.Read"]
-
-# ----------------------------
-# MSAL App
-# ----------------------------
-app = PublicClientApplication(
-    CLIENT_ID,
-    authority=AUTHORITY
+# ─────────────────────────────────────────────
+# PAGE CONFIG
+# ─────────────────────────────────────────────
+st.set_page_config(
+    page_title="Outlook Mail",
+    page_icon="📧",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# ----------------------------
-# Functions
-# ----------------------------
-def get_access_token():
-    flow = app.initiate_device_flow(scopes=SCOPES)
+# ─────────────────────────────────────────────
+# CUSTOM CSS
+# ─────────────────────────────────────────────
+st.markdown("""
+<style>
+    /* ── Global ── */
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
-    if "user_code" not in flow:
-        return None, "Device flow failed"
-
-    return flow, None
-
-
-def get_emails(access_token, top=10):
-    url = (
-        "https://graph.microsoft.com/v1.0/me/messages"
-        f"?$top={top}&$select=subject,from,receivedDateTime,bodyPreview"
-    )
-
-    headers = {
-        "Authorization": f"Bearer {access_token}"
+    html, body, [class*="css"] {
+        font-family: 'DM Sans', sans-serif;
     }
 
-    response = requests.get(url, headers=headers)
+    /* ── Sidebar ── */
+    section[data-testid="stSidebar"] {
+        background: #0f1117;
+        border-right: 1px solid #1e2130;
+    }
+    section[data-testid="stSidebar"] * {
+        color: #c9d1e0 !important;
+    }
 
-    if response.status_code == 200:
-        return response.json().get("value", [])
+    /* ── Email card ── */
+    .email-card {
+        background: #16192a;
+        border: 1px solid #1e2540;
+        border-radius: 12px;
+        padding: 18px 22px;
+        margin-bottom: 12px;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        position: relative;
+    }
+    .email-card:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 1px #3b82f620;
+    }
+    .email-card.unread {
+        border-left: 3px solid #3b82f6;
+        background: #141829;
+    }
+    .email-card.urgent {
+        border-left: 3px solid #ef4444;
+    }
+
+    /* ── Subject line ── */
+    .email-subject {
+        font-size: 15px;
+        font-weight: 600;
+        color: #e8eaf0;
+        margin: 0 0 4px 0;
+        line-height: 1.4;
+    }
+    .email-subject.read {
+        font-weight: 400;
+        color: #8b92a5;
+    }
+
+    /* ── Meta row ── */
+    .email-meta {
+        display: flex;
+        gap: 16px;
+        font-size: 12px;
+        color: #5a6478;
+        font-family: 'DM Mono', monospace;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+    }
+    .email-meta span { display: flex; align-items: center; gap: 4px; }
+
+    /* ── Preview ── */
+    .email-preview {
+        font-size: 13px;
+        color: #6b7485;
+        line-height: 1.6;
+        border-top: 1px solid #1e2540;
+        padding-top: 10px;
+        margin-top: 6px;
+    }
+
+    /* ── Badges ── */
+    .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 500;
+        font-family: 'DM Mono', monospace;
+    }
+    .badge-unread  { background: #1e3a5f; color: #60a5fa; }
+    .badge-urgent  { background: #3b1010; color: #f87171; }
+    .badge-attach  { background: #1a2e1a; color: #4ade80; }
+    .badge-read    { background: #1a1f2e; color: #4b5563; }
+
+    /* ── Open link ── */
+    .open-link a {
+        font-size: 12px;
+        color: #3b82f6 !important;
+        text-decoration: none;
+        font-family: 'DM Mono', monospace;
+    }
+    .open-link a:hover { text-decoration: underline; }
+
+    /* ── Stats cards ── */
+    .stat-card {
+        background: #16192a;
+        border: 1px solid #1e2540;
+        border-radius: 10px;
+        padding: 16px 20px;
+        text-align: center;
+    }
+    .stat-number { font-size: 28px; font-weight: 600; color: #e8eaf0; }
+    .stat-label  { font-size: 12px; color: #5a6478; margin-top: 2px; font-family: 'DM Mono', monospace; }
+
+    /* ── Login page ── */
+    .login-box {
+        max-width: 420px;
+        margin: 80px auto;
+        background: #16192a;
+        border: 1px solid #1e2540;
+        border-radius: 16px;
+        padding: 48px 40px;
+        text-align: center;
+    }
+    .login-title {
+        font-size: 26px;
+        font-weight: 600;
+        color: #e8eaf0;
+        margin-bottom: 8px;
+    }
+    .login-sub {
+        font-size: 14px;
+        color: #5a6478;
+        margin-bottom: 32px;
+    }
+
+    /* ── Streamlit overrides ── */
+    .stButton > button {
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 20px;
+        font-family: 'DM Sans', sans-serif;
+        font-weight: 500;
+        transition: background 0.2s;
+    }
+    .stButton > button:hover { background: #1d4ed8; color: white; }
+
+    div[data-testid="stSelectbox"] label,
+    div[data-testid="stNumberInput"] label { color: #8b92a5 !important; font-size: 13px; }
+
+    .stSelectbox > div > div { background: #16192a; border-color: #1e2540; color: #c9d1e0; }
+
+    /* Hide default streamlit header clutter */
+    #MainMenu { visibility: hidden; }
+    footer     { visibility: hidden; }
+    header     { visibility: hidden; }
+</style>
+""", unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────
+# CONFIG
+# ─────────────────────────────────────────────
+CLIENT_ID = st.secrets["CLIENT_ID"]
+TENANT_ID = st.secrets["TENANT_ID"]
+AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
+SCOPES    = ["Mail.Read", "User.Read"]
+
+app = PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
+
+# ─────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────
+def get_user_info(token):
+    r = requests.get(
+        "https://graph.microsoft.com/v1.0/me",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    return (r.json(), None) if r.status_code == 200 else (None, r.text)
+
+
+def get_emails(token, top=10, folder="all", search="", only_unread=False):
+    folder_map = {
+        "all":    "me/messages",
+        "inbox":  "me/mailFolders/inbox/messages",
+        "sent":   "me/mailFolders/sentitems/messages",
+        "drafts": "me/mailFolders/drafts/messages",
+        "junk":   "me/mailFolders/junkemail/messages",
+    }
+    path = folder_map.get(folder, "me/messages")
+    filters = []
+    if only_unread:
+        filters.append("isRead eq false")
+
+    url = f"https://graph.microsoft.com/v1.0/{path}?$top={top}&$orderby=receivedDateTime desc"
+    if filters:
+        url += f"&$filter={' and '.join(filters)}"
+    if search:
+        url += f"&$search=\"{search}\""
+
+    r = requests.get(url, headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        # $search requires ConsistencyLevel header
+        **({"ConsistencyLevel": "eventual"} if search else {})
+    })
+
+    if r.status_code == 200:
+        data = r.json()
+        return data.get("value", []), data.get("@odata.nextLink"), None
+    elif r.status_code == 401:
+        return [], None, "401: Token expired — please logout and login again."
+    elif r.status_code == 403:
+        return [], None, "403: Mail.Read permission not granted."
     else:
-        st.error(response.text)
-        return []
+        try:
+            msg = r.json().get("error", {}).get("message", r.text)
+        except Exception:
+            msg = r.text
+        return [], None, f"Error {r.status_code}: {msg}"
 
 
-# ----------------------------
-# UI
-# ----------------------------
-st.title("📧 Outlook Email Dashboard (MS Graph)")
-
-# ----------------------------
-# LOGIN SECTION
-# ----------------------------
-if "access_token" not in st.session_state:
-
-    st.info("Please login with Microsoft to continue.")
-
-    if st.button("🔐 Login with Microsoft"):
-
-        flow = app.initiate_device_flow(scopes=SCOPES)
-
-        if "user_code" not in flow:
-            st.error("Device flow failed. Check Azure setup.")
+def format_date(dt_str):
+    if not dt_str:
+        return ""
+    try:
+        dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+        now = datetime.now(dt.tzinfo)
+        diff = now - dt
+        if diff.days == 0:
+            return dt.strftime("Today %I:%M %p")
+        elif diff.days == 1:
+            return dt.strftime("Yesterday %I:%M %p")
+        elif diff.days < 7:
+            return dt.strftime("%A %I:%M %p")
         else:
-            st.info(flow["message"])
+            return dt.strftime("%b %d, %Y")
+    except Exception:
+        return dt_str[:10]
 
-            result = app.acquire_token_by_device_flow(flow)
+
+def render_email_card(email):
+    subject     = email.get("subject") or "(No Subject)"
+    sender_obj  = email.get("from", {}).get("emailAddress", {})
+    sender_name = sender_obj.get("name", "")
+    sender_addr = sender_obj.get("address", "Unknown")
+    preview     = email.get("bodyPreview", "").replace("\r\n", " ").strip()
+    time_str    = format_date(email.get("receivedDateTime", ""))
+    is_read     = email.get("isRead", True)
+    has_attach  = email.get("hasAttachments", False)
+    web_link    = email.get("webLink", "")
+    importance  = email.get("importance", "normal")
+
+    card_class  = "email-card"
+    if not is_read:
+        card_class += " unread"
+    if importance == "high":
+        card_class += " urgent"
+
+    subj_class  = "email-subject" + ("" if not is_read else " read")
+    display_name = sender_name if sender_name else sender_addr
+
+    badges = ""
+    if not is_read:
+        badges += '<span class="badge badge-unread">● UNREAD</span> '
+    if importance == "high":
+        badges += '<span class="badge badge-urgent">↑ URGENT</span> '
+    if has_attach:
+        badges += '<span class="badge badge-attach">⊕ ATTACHMENT</span> '
+
+    open_btn = f'<div class="open-link"><a href="{web_link}" target="_blank">Open in Outlook ↗</a></div>' if web_link else ""
+
+    preview_html = f'<div class="email-preview">{preview[:300]}{"…" if len(preview) > 300 else ""}</div>' if preview else ""
+
+    st.markdown(f"""
+    <div class="{card_class}">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+            <div style="flex:1; min-width:0;">
+                <div style="margin-bottom:6px;">{badges}</div>
+                <div class="{subj_class}">{subject}</div>
+                <div class="email-meta">
+                    <span>👤 {display_name}</span>
+                    <span>✉ {sender_addr}</span>
+                    <span>🕐 {time_str}</span>
+                </div>
+            </div>
+            <div style="flex-shrink:0;">{open_btn}</div>
+        </div>
+        {preview_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────
+# LOGIN PAGE
+# ─────────────────────────────────────────────
+if "access_token" not in st.session_state:
+    st.markdown("""
+    <div class="login-box">
+        <div style="font-size:48px; margin-bottom:16px;">📧</div>
+        <div class="login-title">Outlook Mail</div>
+        <div class="login-sub">Sign in with your Microsoft account to access your inbox</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col = st.columns([1, 2, 1])[1]
+    with col:
+        if st.button("🔐  Sign in with Microsoft", use_container_width=True):
+            flow = app.initiate_device_flow(scopes=SCOPES)
+            if "user_code" not in flow:
+                st.error("Device flow failed. Check your Azure App Registration.")
+                st.stop()
+
+            st.info("**Step 1** — Copy this code:")
+            st.code(flow["user_code"], language=None)
+            st.markdown(f"**Step 2** — [Open Microsoft sign-in page ↗]({flow['verification_uri']})")
+            st.caption("Complete sign-in in the browser window, then wait here.")
+
+            with st.spinner("Waiting for authentication…"):
+                result = app.acquire_token_by_device_flow(flow)
 
             if "access_token" in result:
-                st.session_state["access_token"] = result["access_token"]
-                st.success("✅ Login successful!")
+                st.session_state["access_token"]  = result["access_token"]
+                st.session_state["token_scopes"]  = result.get("scope", "")
+                st.success("✅ Signed in successfully!")
                 st.rerun()
             else:
-                st.error(result.get("error_description"))
+                st.error(f"Sign-in failed: {result.get('error_description', 'Unknown error')}")
 
-# ----------------------------
-# AFTER LOGIN
-# ----------------------------
+# ─────────────────────────────────────────────
+# MAIN APP (after login)
+# ─────────────────────────────────────────────
 else:
-    st.success("🎉 You are logged in!")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("📥 Fetch Emails"):
-            st.session_state["emails"] = get_emails(
-                st.session_state["access_token"],
-                top=10
-            )
-
-    with col2:
-        if st.button("🚪 Logout"):
+    # ── Fetch user info once ──────────────────
+    if "user_info" not in st.session_state:
+        user, err = get_user_info(st.session_state["access_token"])
+        if user:
+            st.session_state["user_info"] = user
+        else:
+            st.error(f"Session error: {err}")
             del st.session_state["access_token"]
-            if "emails" in st.session_state:
-                del st.session_state["emails"]
             st.rerun()
 
-    # ----------------------------
-    # DISPLAY EMAILS
-    # ----------------------------
-    if "emails" in st.session_state:
+    user         = st.session_state.get("user_info", {})
+    display_name = user.get("displayName", "User")
+    email_addr   = user.get("mail") or user.get("userPrincipalName", "")
 
-        st.subheader("📬 Latest Emails")
+    # ── SIDEBAR ───────────────────────────────
+    with st.sidebar:
+        st.markdown(f"""
+        <div style="padding: 16px 0 24px;">
+            <div style="font-size:13px; color:#5a6478; margin-bottom:4px;">Signed in as</div>
+            <div style="font-size:15px; font-weight:600; color:#e8eaf0;">{display_name}</div>
+            <div style="font-size:12px; color:#3b82f6; font-family:'DM Mono',monospace;">{email_addr}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        for email in st.session_state["emails"]:
-            st.markdown("---")
+        st.divider()
 
-            subject = email.get("subject", "No Subject")
-            sender = email.get("from", {}).get("emailAddress", {}).get("address", "Unknown")
-            preview = email.get("bodyPreview", "")
-            time = email.get("receivedDateTime", "")
+        st.markdown("**📁 Folder**")
+        folder = st.selectbox(
+            "folder", label_visibility="collapsed",
+            options=["all", "inbox", "sent", "drafts", "junk"],
+            format_func=lambda x: {
+                "all":    "📬  All Messages",
+                "inbox":  "📥  Inbox",
+                "sent":   "📤  Sent",
+                "drafts": "📝  Drafts",
+                "junk":   "🗑️  Junk",
+            }[x]
+        )
 
-            st.write(f"**📌 Subject:** {subject}")
-            st.write(f"**👤 From:** {sender}")
-            st.write(f"**⏰ Time:** {time}")
-            st.write(f"**📝 Preview:** {preview}")
+        st.markdown("**🔢 Count**")
+        top_n = st.selectbox("count", label_visibility="collapsed",
+                             options=[5, 10, 20, 50], index=1)
+
+        st.markdown("**🔍 Search**")
+        search_query = st.text_input("search", label_visibility="collapsed",
+                                     placeholder="Search subject, sender…")
+
+        only_unread = st.checkbox("Unread only")
+
+        st.markdown("")
+        fetch_btn = st.button("📥  Fetch Emails", use_container_width=True)
+
+        st.divider()
+        if st.button("🚪  Logout", use_container_width=True):
+            for k in ["access_token", "emails", "user_info", "token_scopes", "next_link", "stats"]:
+                st.session_state.pop(k, None)
+            st.rerun()
+
+    # ── FETCH ─────────────────────────────────
+    if fetch_btn:
+        with st.spinner("Fetching emails…"):
+            emails, next_link, err = get_emails(
+                st.session_state["access_token"],
+                top=top_n,
+                folder=folder,
+                search=search_query,
+                only_unread=only_unread,
+            )
+        if err:
+            st.error(err)
+        else:
+            st.session_state["emails"]    = emails
+            st.session_state["next_link"] = next_link
+            st.session_state["folder"]    = folder
+            # Compute stats
+            st.session_state["stats"] = {
+                "total":   len(emails),
+                "unread":  sum(1 for e in emails if not e.get("isRead", True)),
+                "urgent":  sum(1 for e in emails if e.get("importance") == "high"),
+                "attach":  sum(1 for e in emails if e.get("hasAttachments", False)),
+            }
+
+    # ── MAIN AREA ─────────────────────────────
+    st.markdown(f"""
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:24px;">
+        <span style="font-size:28px;">📧</span>
+        <div>
+            <div style="font-size:22px; font-weight:600; color:#e8eaf0;">Outlook Mail</div>
+            <div style="font-size:13px; color:#5a6478; font-family:'DM Mono',monospace;">{email_addr}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Stats row ─────────────────────────────
+    if "stats" in st.session_state:
+        s = st.session_state["stats"]
+        c1, c2, c3, c4 = st.columns(4)
+        for col, num, label, color in [
+            (c1, s["total"],  "TOTAL",      "#3b82f6"),
+            (c2, s["unread"], "UNREAD",     "#60a5fa"),
+            (c3, s["urgent"], "URGENT",     "#ef4444"),
+            (c4, s["attach"], "W/ ATTACH",  "#4ade80"),
+        ]:
+            with col:
+                st.markdown(f"""
+                <div class="stat-card">
+                    <div class="stat-number" style="color:{color};">{num}</div>
+                    <div class="stat-label">{label}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
+
+    # ── Email list ────────────────────────────
+    if "emails" not in st.session_state:
+        st.markdown("""
+        <div style="text-align:center; padding:80px 0; color:#3a4155;">
+            <div style="font-size:48px; margin-bottom:16px;">📭</div>
+            <div style="font-size:16px;">Select a folder and click <b>Fetch Emails</b> to load your mail</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        emails = st.session_state["emails"]
+        folder_label = st.session_state.get("folder", "all")
+
+        if not emails:
+            st.markdown("""
+            <div style="text-align:center; padding:60px 0; color:#3a4155;">
+                <div style="font-size:40px; margin-bottom:12px;">📭</div>
+                <div style="font-size:15px;">No emails found in this folder.</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(
+                f'<div style="font-size:13px; color:#5a6478; font-family:\'DM Mono\',monospace; '
+                f'margin-bottom:16px;">{len(emails)} email(s) · {folder_label.upper()}</div>',
+                unsafe_allow_html=True
+            )
+            for email in emails:
+                render_email_card(email)
+
+            if st.session_state.get("next_link"):
+                st.markdown(
+                    '<div style="text-align:center; padding:16px 0; color:#3a4155; font-size:13px;">'
+                    'More emails available — increase the count to load more.'
+                    '</div>',
+                    unsafe_allow_html=True
+                )
+
