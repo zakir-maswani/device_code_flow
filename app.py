@@ -1,11 +1,12 @@
 import streamlit as st
 import requests
+import html
 from msal import PublicClientApplication
 from datetime import datetime, timedelta, timezone
 
-# ----------------------------
+# ---------------------------------------------------
 # CONFIG
-# ----------------------------
+# ---------------------------------------------------
 CLIENT_ID = st.secrets["CLIENT_ID"]
 
 AUTHORITY = "https://login.microsoftonline.com/consumers"
@@ -20,18 +21,18 @@ app = PublicClientApplication(
     authority=AUTHORITY
 )
 
-# ----------------------------
+# ---------------------------------------------------
 # PAGE CONFIG
-# ----------------------------
+# ---------------------------------------------------
 st.set_page_config(
     page_title="Outlook Weekly Emails",
     page_icon="📧",
     layout="wide"
 )
 
-# ----------------------------
+# ---------------------------------------------------
 # CUSTOM CSS
-# ----------------------------
+# ---------------------------------------------------
 st.markdown("""
 <style>
 
@@ -41,60 +42,59 @@ st.markdown("""
 
 .stButton > button {
     width: 100%;
-    border-radius: 10px;
+    border-radius: 12px;
     height: 3em;
+    font-size: 16px;
     font-weight: 600;
     border: none;
 }
 
-.email-card {
-    background-color: #ffffff10;
-    border: 1px solid #ffffff20;
-    padding: 18px;
-    border-radius: 14px;
-    margin-bottom: 15px;
-}
-
-.security-box {
-    background: linear-gradient(90deg, #0f172a, #111827);
-    padding: 16px;
-    border-radius: 14px;
-    border: 1px solid #334155;
-    margin-top: 10px;
-    margin-bottom: 20px;
-}
-
 .header-box {
-    padding: 20px;
+    padding: 25px;
     border-radius: 18px;
     background: linear-gradient(135deg, #2563eb, #1d4ed8);
     color: white;
     margin-bottom: 25px;
 }
 
+.email-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 18px;
+    border-radius: 16px;
+    margin-bottom: 15px;
+}
+
+.security-box {
+    background: rgba(37, 99, 235, 0.08);
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    padding: 15px;
+    border-radius: 14px;
+}
+
 .small-text {
+    opacity: 0.9;
     font-size: 14px;
-    opacity: 0.85;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# ----------------------------
+# ---------------------------------------------------
 # HEADER
-# ----------------------------
+# ---------------------------------------------------
 st.markdown("""
 <div class="header-box">
     <h1>📧 Outlook Weekly Email Dashboard</h1>
     <p class="small-text">
-        Securely access and view your last 7 days emails using Microsoft Graph API.
+        Securely access your last 7 days Outlook emails using Microsoft Graph API.
     </p>
 </div>
 """, unsafe_allow_html=True)
 
-# ----------------------------
+# ---------------------------------------------------
 # SIDEBAR
-# ----------------------------
+# ---------------------------------------------------
 with st.sidebar:
 
     st.title("⚙️ Dashboard")
@@ -105,14 +105,14 @@ with st.sidebar:
 
     st.markdown("""
     <div class="security-box">
-        ✅ Your emails are accessed securely using Microsoft authentication.<br><br>
-        
-        ✅ Your data is <b>NOT stored</b> anywhere.<br><br>
-        
+        ✅ Your emails are securely accessed using Microsoft Authentication.<br><br>
+
+        ✅ Your data is NOT stored anywhere.<br><br>
+
         ✅ No database is used.<br><br>
-        
-        ✅ Emails are fetched temporarily during your session only.<br><br>
-        
+
+        ✅ Emails are fetched temporarily during your active session only.<br><br>
+
         ✅ Authentication is handled directly by Microsoft.
     </div>
     """, unsafe_allow_html=True)
@@ -129,53 +129,61 @@ with st.sidebar:
     - Secure session-based access  
     """)
 
-# ----------------------------
+# ---------------------------------------------------
 # LOGIN
-# ----------------------------
+# ---------------------------------------------------
 if "access_token" not in st.session_state:
 
     st.info("🔓 Login with your Microsoft account to continue")
 
     if st.button("🔐 Login with Microsoft"):
 
-        flow = app.initiate_device_flow(scopes=SCOPES)
+        try:
 
-        if "user_code" not in flow:
-            st.error("❌ Device flow failed")
-            st.stop()
+            flow = app.initiate_device_flow(scopes=SCOPES)
 
-        st.markdown("### 👇 Complete Login")
+            if "user_code" not in flow:
+                st.error("❌ Device flow failed")
+                st.stop()
 
-        st.code(flow["user_code"])
+            st.markdown("### 👇 Complete Login")
 
-        st.markdown(
-            f"""
-            Visit: **{flow['verification_uri']}**  
-            and enter the code above.
-            """
-        )
+            st.code(flow["user_code"])
 
-        with st.spinner("Waiting for login..."):
+            st.markdown(
+                f"""
+                Visit: **{flow['verification_uri']}**  
+                and enter the code above.
+                """
+            )
 
-            result = app.acquire_token_by_device_flow(flow)
+            with st.spinner("Waiting for login..."):
 
-        if "access_token" in result:
+                result = app.acquire_token_by_device_flow(flow)
 
-            st.session_state["access_token"] = result["access_token"]
+            if "access_token" in result:
 
-            st.success("✅ Login successful")
+                st.session_state["access_token"] = result["access_token"]
 
-            st.rerun()
+                st.success("✅ Login successful")
 
-        else:
+                st.rerun()
 
-            st.error("❌ Login failed")
+            else:
 
-            st.write(result)
+                error_message = result.get(
+                    "error_description",
+                    "Login failed"
+                )
 
-# ----------------------------
+                st.error(error_message)
+
+        except Exception as e:
+            st.error(f"❌ {str(e)}")
+
+# ---------------------------------------------------
 # AFTER LOGIN
-# ----------------------------
+# ---------------------------------------------------
 else:
 
     access_token = st.session_state["access_token"]
@@ -188,68 +196,107 @@ else:
     with col2:
         logout_btn = st.button("🚪 Logout")
 
+    # Logout
     if logout_btn:
         st.session_state.clear()
         st.rerun()
 
+    # Fetch Emails
     if fetch_btn:
 
         with st.spinner("📬 Fetching emails..."):
 
-            last_week = (
-                datetime.now(timezone.utc) - timedelta(days=7)
-            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+            try:
 
-            url = (
-                "https://graph.microsoft.com/v1.0/me/messages"
-                f"?$filter=receivedDateTime ge {last_week}"
-                "&$top=100"
-                "&$orderby=receivedDateTime DESC"
-            )
+                # Last 7 days datetime
+                last_week = (
+                    datetime.now(timezone.utc) - timedelta(days=7)
+                ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-            headers = {
-                "Authorization": f"Bearer {access_token}"
-            }
+                # Graph API URL
+                url = (
+                    "https://graph.microsoft.com/v1.0/me/messages"
+                    f"?$filter=receivedDateTime ge {last_week}"
+                    "&$top=100"
+                    "&$orderby=receivedDateTime DESC"
+                )
 
-            response = requests.get(url, headers=headers)
+                headers = {
+                    "Authorization": f"Bearer {access_token}"
+                }
 
-            if response.status_code == 200:
+                response = requests.get(
+                    url,
+                    headers=headers,
+                    timeout=20
+                )
 
-                emails = response.json().get("value", [])
+                # Success
+                if response.status_code == 200:
 
-                st.success(f"✅ {len(emails)} emails found")
+                    emails = response.json().get("value", [])
 
-                if not emails:
-                    st.info("No emails found in last 7 days")
+                    st.success(f"✅ {len(emails)} emails found")
 
-                for email in emails:
+                    if not emails:
+                        st.info("No emails found in last 7 days")
 
-                    subject = email.get("subject", "No Subject")
+                    for email in emails:
 
-                    sender = (
-                        email.get("from", {})
-                        .get("emailAddress", {})
-                        .get("address", "Unknown")
+                        # Escape HTML content
+                        subject = html.escape(
+                            email.get("subject", "No Subject")
+                        )
+
+                        sender = html.escape(
+                            email.get("from", {})
+                            .get("emailAddress", {})
+                            .get("address", "Unknown")
+                        )
+
+                        received = html.escape(
+                            email.get("receivedDateTime", "")
+                        )
+
+                        preview = html.escape(
+                            email.get("bodyPreview", "")
+                        )
+
+                        st.markdown(f"""
+                        <div class="email-card">
+                            <h4>📩 {subject}</h4>
+                            <p><b>From:</b> {sender}</p>
+                            <p><b>Received:</b> {received}</p>
+                            <p>{preview}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                # Unauthorized
+                elif response.status_code == 401:
+
+                    st.error(
+                        "❌ Session expired. Please login again."
                     )
 
-                    received = email.get("receivedDateTime", "")
+                    st.session_state.clear()
 
-                    preview = email.get("bodyPreview", "")
+                # Other errors
+                else:
 
-                    st.markdown(f"""
-                    <div class="email-card">
-                        <h4>📩 {subject}</h4>
-                        <p><b>From:</b> {sender}</p>
-                        <p><b>Received:</b> {received}</p>
-                        <p>{preview}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.error(
+                        f"❌ Error: {response.status_code}"
+                    )
 
-            else:
+                    try:
+                        st.json(response.json())
+                    except:
+                        st.write(response.text)
 
-                st.error(f"❌ Error: {response.status_code}")
+            except requests.exceptions.Timeout:
+                st.error("⏱️ Request timeout")
 
-                try:
-                    st.json(response.json())
-                except:
-                    st.write(response.text)
+            except requests.exceptions.ConnectionError:
+                st.error("🌐 Network connection error")
+
+            except Exception as e:
+                st.error(f"❌ {str(e)}")
