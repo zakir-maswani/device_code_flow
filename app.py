@@ -18,21 +18,17 @@ app = PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
 # Functions
 # ----------------------------
 def get_emails(access_token):
-    # Try Graph endpoint first
     url = "https://graph.microsoft.com/v1.0/me/messages?$top=10&$orderby=receivedDateTime desc"
     headers = {"Authorization": f"Bearer {access_token}"}
     response = requests.get(url, headers=headers)
     
-    if response.status_code == 401:
-        st.warning("Personal account detected. Trying Outlook REST API...")
-        # Fallback: Use Outlook REST API (legacy, but works for personal accounts)
-        url = "https://outlook.office365.com/api/v2.0/me/mailfolders/inbox/messages?$top=10"
-        response = requests.get(url, headers=headers)
+    st.write("Status:", response.status_code)
     
     if response.status_code == 200:
         return response.json().get("value", [])
     else:
-        st.error(f"Error {response.status_code}: {response.text}")
+        st.error(f"Error {response.status_code}")
+        st.code(response.text)  # ✅ safe, works even if response isn't JSON
         return []
         
 def try_silent_login():
