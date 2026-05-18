@@ -125,7 +125,8 @@ def get_emails(access_token: str) -> tuple[list, Dict[str, Any]]:
                 error_json = response.json()
                 debug_info["error_details"] = error_json
                 st.error(f"❌ Error {response.status_code}")
-                st.json(error_json)
+                import json
+                st.code(json.dumps(error_json, indent=2, default=str), language="json")
             except:
                 st.error(f"❌ Error {response.status_code}")
                 st.code(response.text, language="text")
@@ -207,7 +208,11 @@ if "access_token" not in st.session_state:
                     
                     if "user_code" not in flow:
                         st.error("❌ Device flow failed. Check your Azure app registration.")
-                        st.json(flow)
+                        try:
+                            import json
+                            st.code(json.dumps(flow, indent=2, default=str), language="json")
+                        except:
+                            st.write(flow)
                         st.stop()
 
                 st.markdown("### 👇 Complete login in your browser")
@@ -225,7 +230,11 @@ if "access_token" not in st.session_state:
                 else:
                     err = result.get("error_description", result.get("error", "Unknown error"))
                     st.error(f"❌ Login failed: {err}")
-                    st.json(result)
+                    try:
+                        import json
+                        st.code(json.dumps(result, indent=2, default=str), language="json")
+                    except:
+                        st.write(result)
             except Exception as e:
                 st.error(f"❌ Login error: {e}")
     
@@ -315,7 +324,14 @@ else:
         
         # All claims
         with st.expander("📋 All Token Claims"):
-            st.json(checks["full_token"])
+            try:
+                # Convert to JSON-serializable format
+                import json
+                token_str = json.dumps(checks["full_token"], indent=2, default=str)
+                st.code(token_str, language="json")
+            except Exception as e:
+                st.write("**Raw Token Data:**")
+                st.write(checks["full_token"])
     
     # ----------------------------
     # FULL DEBUG TAB
@@ -372,7 +388,12 @@ else:
         # Last API call debug
         if "last_debug" in st.session_state:
             with st.expander("📊 Last API Call Debug", expanded=True):
-                st.json(st.session_state["last_debug"])
+                try:
+                    import json
+                    debug_str = json.dumps(st.session_state["last_debug"], indent=2, default=str)
+                    st.code(debug_str, language="json")
+                except Exception as e:
+                    st.write(st.session_state["last_debug"])
         
         # Environment info
         with st.expander("🖥️ Environment Info", expanded=False):
