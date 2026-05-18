@@ -62,7 +62,12 @@ def validate_token(token: str) -> Dict[str, Any]:
     decoded = decode_token(token)
     
     if "error" in decoded:
-        return {"valid": False, "error": decoded["error"]}
+        return {
+            "valid": False, 
+            "error": decoded["error"],
+            "checks": {},
+            "full_token": {}
+        }
     
     now = int(time.time())
     exp = decoded.get("exp", 0)
@@ -77,14 +82,14 @@ def validate_token(token: str) -> Dict[str, Any]:
         "idp": decoded.get("idp"),
         "expired": exp < now,
         "expires_in_seconds": max(0, exp - now),
-        "expires_at": datetime.utcfromtimestamp(exp).isoformat(),
-        "issued_at": datetime.utcfromtimestamp(decoded.get("iat", 0)).isoformat(),
+        "expires_at": datetime.utcfromtimestamp(exp).isoformat() if exp > 0 else "Invalid",
+        "issued_at": datetime.utcfromtimestamp(decoded.get("iat", 0)).isoformat() if decoded.get("iat", 0) > 0 else "Invalid",
     }
     
     return {
         "valid": exp > now and "Mail.Read" in decoded.get("scp", ""),
         "checks": checks,
-        "full_token": decoded
+        "full_token": decoded if decoded else {}
     }
 
 # ----------------------------
@@ -292,36 +297,46 @@ else:
         token_validation = validate_token(token)
         
         # Status indicator
-        if token_validation["valid"]:
+        if token_validation.get("valid", False):
             st.success("✅ Token is valid")
         else:
             st.error("❌ Token is invalid or expired")
         
+        # Show error if present
+        if "error" in token_validation:
+            st.error(f"Error decoding token: {token_validation['error']}")
+        
         # Token checks
-        st.write("**Token Validation Checks:**")
-        checks = token_validation["checks"]
+        checks = token_validation.get("checks", {})
         
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write(f"✅ Has AUD claim: {checks['has_aud']}")
-            st.write(f"✅ Is Graph audience: {checks['is_graph']}")
-            st.write(f"✅ Has Mail.Read scope: {checks['has_mail_scope']}")
-            st.write(f"✅ Account type: {checks['account_type']}")
-        
-        with col2:
-            st.write(f"✅ Expired: {checks['expired']}")
-            st.write(f"✅ Expires in: {checks['expires_in_seconds']} seconds")
-            st.write(f"✅ Issued at: {checks['issued_at']}")
-            st.write(f"✅ Expires at: {checks['expires_at']}")
-        
-        # All claims
-        with st.expander("📋 All Token Claims"):
-            try:
-                token_str = json.dumps(checks["full_token"], indent=2, default=str)
-                st.code(token_str, language="json")
-            except Exception as e:
-                st.warning(f"Could not serialize token: {e}")
-                st.write(str(checks["full_token"]))
+        if checks:
+            st.write("**Token Validation Checks:**")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write(f"✅ Has AUD claim: {checks.get('has_aud', 'N/A')}")
+                st.write(f"✅ Is Graph audience: {checks.get('is_graph', 'N/A')}")
+                st.write(f"✅ Has Mail.Read scope: {checks.get('has_mail_scope', 'N/A')}")
+                st.write(f"✅ Account type: {checks.get('account_type', 'N/A')}")
+            
+            with col2:
+                st.write(f"✅ Expired: {checks.get('expired', 'N/A')}")
+                st.write(f"✅ Expires in: {checks.get('expires_in_seconds', 'N/A')} seconds")
+                st.write(f"✅ Issued at: {checks.get('issued_at', 'N/A')}")
+                st.write(f"✅ Expires at: {checks.get('expires_at', 'N/A')}")
+            
+            # All claims
+            full_token = token_validation.get("full_token", {})
+            if full_token:
+                with st.expander("📋 All Token Claims"):
+                    try:
+                        token_str = json.dumps(full_token, indent=2, default=str)
+                        st.code(token_str, language="json")
+                    except Exception as e:
+                        st.warning(f"Could not serialize token: {e}")
+                        st.write(f"Token data: {type(full_token)}")
+        else:
+            st.info("No token checks available")
     
     # ----------------------------
     # FULL DEBUG TAB
@@ -335,12 +350,18 @@ else:
             st.code(json.dumps(sys_time, indent=2, default=str), language="json")
             
             token_validation = validate_token(token)
-            exp_time = token_validation["checks"]["expires_at"]
-            st.write(f"**Token expires at:** {exp_time}")
-            st.write(f"**Seconds remaining:** {token_validation['checks']['expires_in_seconds']}")
+            checks = token_validation.get("checks", {})
             
-            if token_validation['checks']['expires_in_seconds'] < 60:
-                st.warning("⚠️ Token will expire soon!")
+            if checks:
+                exp_time = checks.get("expires_at", "Unknown")
+                expires_in = checks.get("expires_in_seconds", 0)
+                st.write(f"**Token expires at:** {exp_time}")
+                st.write(f"**Seconds remaining:** {expires_in}")
+                
+                if expires_in < 60:
+                    st.warning("⚠️ Token will expire soon!")
+            else:
+                st.warning("Could not validate token")
         
         # Network connectivity
         with st.expander("🌐 Network Connectivity", expanded=True):
