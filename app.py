@@ -99,7 +99,7 @@ def validate_token(token: str) -> Dict[str, Any]:
 def get_emails(access_token: str) -> tuple[list, Dict[str, Any]]:
     """Fetch emails with full debugging"""
     debug_info = {
-        "endpoint": "https://graph.microsoft.com/v1.0/me/messages",
+        "endpoint": "https://graph.microsoft.com/v1.0/me",
         "status_code": None,
         "response_time": None,
         "error": None,
