@@ -15,7 +15,7 @@ CLIENT_ID = st.secrets.get("CLIENT_ID", "NOT_SET")
 TENANT_ID = st.secrets.get("TENANT_ID", "NOT_SET")
 
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
-SCOPES = ["Mail.Read", "Mail.Send"]
+SCOPES = ["Mail.Read", "User.Read"]
 
 app = PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
 
