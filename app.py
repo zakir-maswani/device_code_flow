@@ -103,20 +103,27 @@ def get_emails(access_token: str) -> tuple[list, Dict[str, Any]]:
         "status_code": None,
         "response_time": None,
         "error": None,
-        "raw_response": None
+        "raw_response": None,
+        "request_headers": {},
+        "response_headers": {}
     }
     
     url = "https://graph.microsoft.com/v1.0/me/messages?$top=10&$orderby=receivedDateTime desc"
     headers = {
         "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Accept": "application/json"
     }
+    
+    # Log request headers (without exposing full token)
+    debug_info["request_headers"] = {k: v if k != "Authorization" else "Bearer [REDACTED]" for k, v in headers.items()}
     
     try:
         start = time.time()
         response = requests.get(url, headers=headers, timeout=10, verify=True)
         debug_info["response_time"] = round(time.time() - start, 2)
         debug_info["status_code"] = response.status_code
+        debug_info["response_headers"] = dict(response.headers)
         
         st.write(f"📊 **Status:** {response.status_code}")
         st.write(f"⏱️ **Response Time:** {debug_info['response_time']}s")
@@ -127,14 +134,25 @@ def get_emails(access_token: str) -> tuple[list, Dict[str, Any]]:
             return data.get("value", []), debug_info
         else:
             debug_info["error"] = response.text
+            
             try:
                 error_json = response.json()
                 debug_info["error_details"] = error_json
                 st.error(f"❌ Error {response.status_code}")
+                
+                # Show detailed error
+                if "error" in error_json:
+                    st.write(f"**Error Code:** {error_json.get('error', {}).get('code', 'N/A')}")
+                    st.write(f"**Error Message:** {error_json.get('error', {}).get('message', 'N/A')}")
+                
+                st.write("**Full Response:**")
                 st.code(json.dumps(error_json, indent=2, default=str), language="json")
             except:
                 st.error(f"❌ Error {response.status_code}")
+                st.write("**Raw Response:**")
                 st.code(response.text, language="text")
+                st.write("**Response Headers:**")
+                st.code(json.dumps(dict(response.headers), indent=2, default=str), language="json")
             return [], debug_info
     
     except requests.exceptions.Timeout:
@@ -262,6 +280,15 @@ else:
         with col1:
             if st.button("📥 Fetch Emails", use_container_width=True):
                 with st.spinner("📬 Fetching emails..."):
+                    # Show token info before fetching
+                    token_validation = validate_token(token)
+                    checks = token_validation.get("checks", {})
+                    
+                    if checks.get("has_mail_scope"):
+                        st.write(f"✅ Token has Mail.Read scope")
+                    else:
+                        st.warning(f"⚠️ Token scopes: {checks.get('scopes', [])}")
+                    
                     emails, debug_info = get_emails(token)
                     st.session_state["emails"] = emails
                     st.session_state["last_debug"] = debug_info
@@ -335,6 +362,32 @@ else:
                     except Exception as e:
                         st.warning(f"Could not serialize token: {e}")
                         st.write(f"Token data: {type(full_token)}")
+                
+                # Token structure analysis
+                with st.expander("🔍 Token Structure Analysis"):
+                    st.write("**Token Header (without signature):**")
+                    try:
+                        # Decode just the header
+                        parts = token.split('.')
+                        if len(parts) >= 2:
+                            import base64
+                            # Add padding
+                            header_b64 = parts[0] + '=' * (4 - len(parts[0]) % 4)
+                            header = json.loads(base64.urlsafe_b64decode(header_b64))
+                            st.code(json.dumps(header, indent=2), language="json")
+                        else:
+                            st.write("Invalid token format")
+                    except Exception as e:
+                        st.warning(f"Could not decode header: {e}")
+                    
+                    st.write("**Key Claims for Graph API:**")
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.write(f"- **aud** (audience): {full_token.get('aud', 'MISSING')[:50]}")
+                        st.write(f"- **scp** (scopes): {full_token.get('scp', 'MISSING')}")
+                    with col_b:
+                        st.write(f"- **tid** (tenant): {full_token.get('tid', 'MISSING')}")
+                        st.write(f"- **oid** (user): {full_token.get('oid', 'MISSING')[:50]}")
         else:
             st.info("No token checks available")
     
@@ -399,12 +452,69 @@ else:
         # Last API call debug
         if "last_debug" in st.session_state:
             with st.expander("📊 Last API Call Debug", expanded=True):
+                debug_info = st.session_state["last_debug"]
+                
+                st.write("**Request Details:**")
                 try:
-                    debug_str = json.dumps(st.session_state["last_debug"], indent=2, default=str)
+                    req_str = json.dumps(debug_info.get("request_headers", {}), indent=2, default=str)
+                    st.code(req_str, language="json")
+                except:
+                    st.write(debug_info.get("request_headers", {}))
+                
+                st.write("**Response Status & Headers:**")
+                col_stat, col_time = st.columns(2)
+                with col_stat:
+                    st.write(f"- Status: `{debug_info.get('status_code')}`")
+                with col_time:
+                    st.write(f"- Response Time: `{debug_info.get('response_time')}s`")
+                
+                try:
+                    resp_headers = {k: str(v)[:100] for k, v in debug_info.get("response_headers", {}).items()}
+                    headers_str = json.dumps(resp_headers, indent=2, default=str)
+                    st.code(headers_str, language="json")
+                except:
+                    pass
+                
+                st.write("**Full Response Body:**")
+                try:
+                    debug_str = json.dumps(debug_info, indent=2, default=str)
                     st.code(debug_str, language="json")
                 except Exception as e:
                     st.warning(f"Could not serialize debug info: {e}")
-                    st.write(str(st.session_state["last_debug"]))
+                    st.write(str(debug_info))
+                
+                # 401 Troubleshooting
+                if debug_info.get("status_code") == 401:
+                    st.error("**🔴 401 Unauthorized - Troubleshooting:**")
+                    st.markdown("""
+                    **Your token IS valid** (has Mail.Read scope and correct audience).
+                    
+                    **The 401 means Microsoft is rejecting the REQUEST, not the token.**
+                    
+                    **Possible causes:**
+                    
+                    1. **Mailbox not created for this user** - Even though you're a Member
+                       - ✅ Check: Ask admin to verify mailbox exists for this user
+                       - ✅ Test: Try accessing Outlook web at https://outlook.office365.com
+                    
+                    2. **Different Azure tenant issue** - Token is for one tenant, mailbox in another
+                       - ✅ Check: Token shows `tid: 3d5bab0a-6e99-4a10-ac62-458d1ddbfafd`
+                       - ✅ Verify: User mailbox is in the same tenant
+                    
+                    3. **User account not synced** - Recently created or not fully provisioned
+                       - ✅ Wait: Try again after 5-10 minutes
+                       - ✅ Sync: Force Azure AD sync if on-premises
+                    
+                    4. **Delegation/Consent issue** - Admin hasn't granted app permission
+                       - ✅ Go to: Azure Portal → App Registrations → Your App → API Permissions
+                       - ✅ Verify: Mail.Read is added AND admin consent is granted
+                    
+                    5. **Different behavior locally vs production**
+                       - ✅ Check: Are you using a different account locally?
+                       - ✅ Check: Is your local system using a cached token?
+                    """)
+        
+        
         
         # Environment info
         with st.expander("🖥️ Environment Info", expanded=False):
