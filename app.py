@@ -15,7 +15,6 @@ CLIENT_ID = st.secrets.get("CLIENT_ID", "NOT_SET")
 TENANT_ID = st.secrets.get("TENANT_ID", "NOT_SET")
 
 AUTHORITY = "https://login.microsoftonline.com/consumers"
-"
 SCOPES = [
     "https://graph.microsoft.com/User.Read",
     "https://graph.microsoft.com/Mail.Read"
