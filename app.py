@@ -10,7 +10,7 @@ CLIENT_ID = st.secrets["CLIENT_ID"]
 TENANT_ID = st.secrets["TENANT_ID"]
 
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
-SCOPES = ["Mail.Read"]
+SCOPES = ["https://graph.microsoft.com/Mail.Read"]
 
 app = PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
 
