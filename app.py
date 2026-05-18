@@ -524,6 +524,35 @@ else:
             st.write(f"**Python Version:** {sys.version}")
             st.write(f"**Platform:** {platform.platform()}")
             st.write(f"**Streamlit Version:** {st.__version__}")
+        
+        # Test different endpoints
+        with st.expander("🧪 Test Different Endpoints", expanded=False):
+            st.write("Testing which Graph endpoints accept your token...")
+            
+            test_endpoints = [
+                ("https://graph.microsoft.com/v1.0/me", "Get current user info"),
+                ("https://graph.microsoft.com/v1.0/me/mailFolders", "List mail folders"),
+                ("https://graph.microsoft.com/v1.0/me/messages?$top=1", "Get 1 message"),
+            ]
+            
+            for endpoint, description in test_endpoints:
+                try:
+                    headers = {
+                        "Authorization": f"Bearer {token}",
+                        "Content-Type": "application/json"
+                    }
+                    resp = requests.get(endpoint, headers=headers, timeout=5)
+                    status_emoji = "✅" if resp.status_code == 200 else "❌"
+                    st.write(f"{status_emoji} **{description}**: HTTP {resp.status_code}")
+                    
+                    if resp.status_code != 200:
+                        try:
+                            error_data = resp.json()
+                            st.write(f"   Error: {error_data.get('error', {}).get('message', 'No message')}")
+                        except:
+                            st.write(f"   Response body empty")
+                except Exception as e:
+                    st.write(f"❌ **{description}**: {e}")
 
 # ----------------------------
 # Footer
