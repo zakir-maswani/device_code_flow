@@ -4,6 +4,7 @@ from msal import PublicClientApplication
 import jwt
 import socket
 import time
+import json
 from datetime import datetime
 from typing import Optional, Dict, Any
 
@@ -125,7 +126,6 @@ def get_emails(access_token: str) -> tuple[list, Dict[str, Any]]:
                 error_json = response.json()
                 debug_info["error_details"] = error_json
                 st.error(f"❌ Error {response.status_code}")
-                import json
                 st.code(json.dumps(error_json, indent=2, default=str), language="json")
             except:
                 st.error(f"❌ Error {response.status_code}")
@@ -173,7 +173,7 @@ with st.sidebar:
     if st.checkbox("Show System Info", value=False):
         sys_time = check_system_time()
         st.write("**System Time:**")
-        st.json(sys_time)
+        st.code(json.dumps(sys_time, indent=2, default=str), language="json")
     
     if st.checkbox("Show Network Status", value=False):
         network = check_network()
@@ -208,11 +208,7 @@ if "access_token" not in st.session_state:
                     
                     if "user_code" not in flow:
                         st.error("❌ Device flow failed. Check your Azure app registration.")
-                        try:
-                            import json
-                            st.code(json.dumps(flow, indent=2, default=str), language="json")
-                        except:
-                            st.write(flow)
+                        st.code(json.dumps(flow, indent=2, default=str), language="json")
                         st.stop()
 
                 st.markdown("### 👇 Complete login in your browser")
@@ -230,11 +226,7 @@ if "access_token" not in st.session_state:
                 else:
                     err = result.get("error_description", result.get("error", "Unknown error"))
                     st.error(f"❌ Login failed: {err}")
-                    try:
-                        import json
-                        st.code(json.dumps(result, indent=2, default=str), language="json")
-                    except:
-                        st.write(result)
+                    st.code(json.dumps(result, indent=2, default=str), language="json")
             except Exception as e:
                 st.error(f"❌ Login error: {e}")
     
@@ -325,13 +317,11 @@ else:
         # All claims
         with st.expander("📋 All Token Claims"):
             try:
-                # Convert to JSON-serializable format
-                import json
                 token_str = json.dumps(checks["full_token"], indent=2, default=str)
                 st.code(token_str, language="json")
             except Exception as e:
-                st.write("**Raw Token Data:**")
-                st.write(checks["full_token"])
+                st.warning(f"Could not serialize token: {e}")
+                st.write(str(checks["full_token"]))
     
     # ----------------------------
     # FULL DEBUG TAB
@@ -342,7 +332,7 @@ else:
         # System time
         with st.expander("⏰ System Time Check", expanded=True):
             sys_time = check_system_time()
-            st.json(sys_time)
+            st.code(json.dumps(sys_time, indent=2, default=str), language="json")
             
             token_validation = validate_token(token)
             exp_time = token_validation["checks"]["expires_at"]
@@ -377,7 +367,7 @@ else:
             st.write(f"- SCOPES: {SCOPES}")
             
             st.write("**MSAL Settings:**")
-            st.write(f"- App instance: {app}")
+            st.write(f"- App instance: {str(app)[:100]}")
             
             accounts = app.get_accounts()
             st.write(f"**Cached accounts: {len(accounts)}**")
@@ -389,11 +379,11 @@ else:
         if "last_debug" in st.session_state:
             with st.expander("📊 Last API Call Debug", expanded=True):
                 try:
-                    import json
                     debug_str = json.dumps(st.session_state["last_debug"], indent=2, default=str)
                     st.code(debug_str, language="json")
                 except Exception as e:
-                    st.write(st.session_state["last_debug"])
+                    st.warning(f"Could not serialize debug info: {e}")
+                    st.write(str(st.session_state["last_debug"]))
         
         # Environment info
         with st.expander("🖥️ Environment Info", expanded=False):
@@ -403,16 +393,6 @@ else:
             st.write(f"**Python Version:** {sys.version}")
             st.write(f"**Platform:** {platform.platform()}")
             st.write(f"**Streamlit Version:** {st.__version__}")
-            
-            try:
-                import streamlit.config
-                st.write("**Streamlit Config:**")
-                st.json({
-                    "client.showErrorDetails": streamlit.config.get_option("client.showErrorDetails"),
-                    "logger.level": streamlit.config.get_option("logger.level"),
-                })
-            except:
-                pass
 
 # ----------------------------
 # Footer
