@@ -108,7 +108,7 @@ def get_emails(access_token: str) -> tuple[list, Dict[str, Any]]:
         "response_headers": {}
     }
     
-    url = "https://graph.microsoft.com/v1.0/me/messages?$top=10&$orderby=receivedDateTime desc"
+    url = "https://graph.microsoft.com/v1.0/me/messages?$top=10"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
