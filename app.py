@@ -3,9 +3,14 @@ import requests
 import json
 from msal import PublicClientApplication
 from datetime import datetime, timedelta, timezone
-from groq import Groq
 import os
-from dotenv import load_dotenv
+
+# Try importing groq, handle if not available
+try:
+    from groq import Groq
+    GROQ_AVAILABLE = True
+except ImportError:
+    GROQ_AVAILABLE = False
 
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches
@@ -14,16 +19,38 @@ from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
 # ---------------------------------------------------
-# LOAD ENV
+# PAGE CONFIG (MUST BE FIRST)
 # ---------------------------------------------------
-load_dotenv()
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-groq_client = Groq(api_key=GROQ_API_KEY)
+st.set_page_config(
+    page_title="Outlook Weekly Emails",
+    page_icon="📧",
+    layout="wide"
+)
+
+# ---------------------------------------------------
+# LOAD SECRETS SAFELY
+# ---------------------------------------------------
+try:
+    CLIENT_ID = st.secrets["CLIENT_ID"]
+except KeyError:
+    st.error("❌ CLIENT_ID not found in secrets!")
+    st.info("Add CLIENT_ID to .streamlit/secrets.toml")
+    st.stop()
+
+# Load Groq API Key safely
+GROQ_API_KEY = None
+groq_client = None
+
+try:
+    GROQ_API_KEY = st.secrets.get("GROQ_API_KEY")
+    if GROQ_API_KEY and GROQ_AVAILABLE:
+        groq_client = Groq(api_key=GROQ_API_KEY)
+except Exception as e:
+    st.warning(f"⚠️ Groq not configured: {str(e)}")
 
 # ---------------------------------------------------
 # CONFIG
 # ---------------------------------------------------
-CLIENT_ID = st.secrets["CLIENT_ID"]
 AUTHORITY = "https://login.microsoftonline.com/consumers"
 SCOPES = [
     "https://graph.microsoft.com/User.Read",
@@ -31,15 +58,6 @@ SCOPES = [
 ]
 
 app = PublicClientApplication(CLIENT_ID, authority=AUTHORITY)
-
-# ---------------------------------------------------
-# PAGE CONFIG
-# ---------------------------------------------------
-st.set_page_config(
-    page_title="Outlook Weekly Emails",
-    page_icon="📧",
-    layout="wide"
-)
 
 # ---------------------------------------------------
 # DOCX HELPER FUNCTIONS
@@ -80,32 +98,49 @@ def paragraph(doc_or_cell, text, bold=False, italic=False,
 # ---------------------------------------------------
 def analyze_email(email: dict) -> dict:
     """Analyze email using Groq Llama"""
-    prompt = f"""You are an executive email analyst. Analyse the email and return ONLY valid JSON — no markdown, no extra text.
+    if not groq_client:
+        return {
+            "priority": "Medium",
+            "summary": "AI analysis not available",
+            "action_item": "Review manually.",
+            "sentiment": "Neutral",
+            "category": "Other"
+        }
+    
+    try:
+        subject = email.get("subject", "(no subject)")[:100]
+        sender = email.get("from", {}).get("emailAddress", {}).get("address", "Unknown")
+        preview = email.get("bodyPreview", "")[:400]
+        
+        prompt = f"""Analyze this email and return ONLY valid JSON, no markdown:
 
-Subject : {email.get("subject", "(no subject)")}
-From    : {email.get("from", {}).get("emailAddress", {}).get("address", "Unknown")}
-Preview : {email.get("bodyPreview", "")[:600]}
+Subject: {subject}
+From: {sender}
+Preview: {preview}
 
 Return exactly:
 {{
-  "priority":    "Critical|High|Medium|Low",
-  "summary":     "2-3 sentence plain-English explanation of what this email is about and why it matters.",
-  "action_item": "One concrete next step, or 'No action required'.",
-  "sentiment":   "Positive|Neutral|Negative|Urgent",
-  "category":    "Meeting|Finance|Support|Project|Legal|Other"
+  "priority": "Critical|High|Medium|Low",
+  "summary": "2-3 sentences about what this email is about",
+  "action_item": "One next step, or 'No action required'",
+  "sentiment": "Positive|Neutral|Negative|Urgent",
+  "category": "Meeting|Finance|Support|Project|Legal|Other"
 }}"""
-    try:
+        
         res = groq_client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
         )
-        raw = res.choices[0].message.content.strip().replace("```json", "").replace("```", "").strip()
+        
+        raw = res.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
         return json.loads(raw)
-    except Exception:
+    
+    except Exception as e:
         return {
             "priority": "Medium",
-            "summary": "Could not generate summary.",
+            "summary": "Could not analyze",
             "action_item": "Review manually.",
             "sentiment": "Neutral",
             "category": "Other"
@@ -116,117 +151,124 @@ Return exactly:
 # ---------------------------------------------------
 def generate_docx(emails):
     """Generate professional docx report"""
-    doc = Document()
-    
-    # Setup page
-    section = doc.sections[0]
-    section.left_margin = Inches(1)
-    section.right_margin = Inches(1)
-    section.top_margin = Inches(1)
-    section.bottom_margin = Inches(1)
-    
-    # Title
-    title = doc.add_paragraph()
-    title_run = title.add_run("📧 Weekly Email Intelligence Report")
-    title_run.font.size = Pt(24)
-    title_run.font.bold = True
-    title_run.font.color.rgb = RGBColor(13, 27, 42)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    
-    # Date
-    date_para = doc.add_paragraph()
-    date_run = date_para.add_run(f"Generated: {datetime.utcnow().strftime('%d %b %Y')}")
-    date_run.font.size = Pt(10)
-    date_run.font.color.rgb = RGBColor(107, 114, 128)
-    date_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    
-    doc.add_paragraph()  # Spacer
-    
-    # Summary
-    summary_heading = doc.add_paragraph()
-    summary_run = summary_heading.add_run("SUMMARY")
-    summary_run.font.size = Pt(12)
-    summary_run.font.bold = True
-    summary_run.font.color.rgb = RGBColor(75, 85, 99)
-    
-    summary_para = doc.add_paragraph(f"Total emails analyzed: {len(emails)}")
-    
-    critical = sum(1 for e in emails if e.get("analysis", {}).get("priority") == "Critical")
-    high = sum(1 for e in emails if e.get("analysis", {}).get("priority") == "High")
-    
-    doc.add_paragraph(f"Critical priority: {critical}")
-    doc.add_paragraph(f"High priority: {high}")
-    
-    doc.add_paragraph()  # Spacer
-    
-    # Email Details
-    details_heading = doc.add_paragraph()
-    details_run = details_heading.add_run("EMAIL DETAILS")
-    details_run.font.size = Pt(12)
-    details_run.font.bold = True
-    details_run.font.color.rgb = RGBColor(75, 85, 99)
-    
-    for idx, email in enumerate(emails, 1):
-        email_para = doc.add_paragraph()
-        email_para.paragraph_format.left_indent = Inches(0.25)
+    try:
+        doc = Document()
         
-        # Email header
-        subj_run = email_para.add_run(f"{idx}. {email.get('subject', 'No Subject')[:80]}\n")
-        subj_run.font.bold = True
-        subj_run.font.size = Pt(11)
+        # Setup page
+        section = doc.sections[0]
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
         
-        analysis = email.get("analysis", {})
+        # Title
+        title = doc.add_paragraph()
+        title_run = title.add_run("📧 Weekly Email Intelligence Report")
+        title_run.font.size = Pt(24)
+        title_run.font.bold = True
+        title_run.font.color.rgb = RGBColor(13, 27, 42)
+        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
-        # From
-        from_run = email_para.add_run(f"From: {email.get('from', {}).get('emailAddress', {}).get('address', 'Unknown')}\n")
-        from_run.font.size = Pt(9)
+        # Date
+        date_para = doc.add_paragraph()
+        date_run = date_para.add_run(f"Generated: {datetime.utcnow().strftime('%d %b %Y')}")
+        date_run.font.size = Pt(10)
+        date_run.font.color.rgb = RGBColor(107, 114, 128)
+        date_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
-        # Priority
-        priority = analysis.get("priority", "Medium")
-        priority_color_map = {
-            "Critical": RGBColor(239, 68, 68),
-            "High": RGBColor(245, 158, 11),
-            "Medium": RGBColor(16, 185, 129),
-            "Low": RGBColor(148, 163, 184),
-        }
-        priority_run = email_para.add_run(f"Priority: {priority} | ")
-        priority_run.font.size = Pt(9)
-        priority_run.font.color.rgb = priority_color_map.get(priority, RGBColor(75, 85, 99))
-        priority_run.font.bold = True
-        
-        # Sentiment
-        sentiment = analysis.get("sentiment", "Neutral")
-        sentiment_run = email_para.add_run(f"Sentiment: {sentiment}\n")
-        sentiment_run.font.size = Pt(9)
-        
-        # Category
-        category = analysis.get("category", "Other")
-        category_run = email_para.add_run(f"Category: {category}\n")
-        category_run.font.size = Pt(9)
+        doc.add_paragraph()
         
         # Summary
-        summary = analysis.get("summary", "No summary available")
-        summary_run = email_para.add_run(f"Summary: {summary}\n")
-        summary_run.font.size = Pt(9)
-        summary_run.italic = True
+        summary_heading = doc.add_paragraph()
+        summary_run = summary_heading.add_run("SUMMARY")
+        summary_run.font.size = Pt(12)
+        summary_run.font.bold = True
+        summary_run.font.color.rgb = RGBColor(75, 85, 99)
         
-        # Action Item
-        action = analysis.get("action_item", "No action required")
-        action_run = email_para.add_run(f"Action: {action}\n")
-        action_run.font.size = Pt(9)
-        action_run.font.color.rgb = RGBColor(26, 86, 219)
-        action_run.font.bold = True
+        doc.add_paragraph(f"Total emails analyzed: {len(emails)}")
         
-        # Preview
-        preview = email.get("bodyPreview", "")[:200]
-        preview_run = email_para.add_run(f"Preview: {preview}...\n")
-        preview_run.font.size = Pt(9)
-        preview_run.font.color.rgb = RGBColor(107, 114, 128)
+        critical = sum(1 for e in emails if e.get("analysis", {}).get("priority") == "Critical")
+        high = sum(1 for e in emails if e.get("analysis", {}).get("priority") == "High")
+        
+        doc.add_paragraph(f"Critical priority: {critical}")
+        doc.add_paragraph(f"High priority: {high}")
+        
+        doc.add_paragraph()
+        
+        # Email Details
+        details_heading = doc.add_paragraph()
+        details_run = details_heading.add_run("EMAIL DETAILS")
+        details_run.font.size = Pt(12)
+        details_run.font.bold = True
+        details_run.font.color.rgb = RGBColor(75, 85, 99)
+        
+        for idx, email in enumerate(emails, 1):
+            email_para = doc.add_paragraph()
+            email_para.paragraph_format.left_indent = Inches(0.25)
+            
+            # Email header
+            subject = email.get('subject', 'No Subject')[:80]
+            subj_run = email_para.add_run(f"{idx}. {subject}\n")
+            subj_run.font.bold = True
+            subj_run.font.size = Pt(11)
+            
+            analysis = email.get("analysis", {})
+            
+            # From
+            from_addr = email.get('from', {}).get('emailAddress', {}).get('address', 'Unknown')
+            from_run = email_para.add_run(f"From: {from_addr}\n")
+            from_run.font.size = Pt(9)
+            
+            # Priority
+            priority = analysis.get("priority", "Medium")
+            priority_color_map = {
+                "Critical": RGBColor(239, 68, 68),
+                "High": RGBColor(245, 158, 11),
+                "Medium": RGBColor(16, 185, 129),
+                "Low": RGBColor(148, 163, 184),
+            }
+            priority_run = email_para.add_run(f"Priority: {priority} | ")
+            priority_run.font.size = Pt(9)
+            priority_run.font.color.rgb = priority_color_map.get(priority, RGBColor(75, 85, 99))
+            priority_run.font.bold = True
+            
+            # Sentiment
+            sentiment = analysis.get("sentiment", "Neutral")
+            sentiment_run = email_para.add_run(f"Sentiment: {sentiment}\n")
+            sentiment_run.font.size = Pt(9)
+            
+            # Category
+            category = analysis.get("category", "Other")
+            category_run = email_para.add_run(f"Category: {category}\n")
+            category_run.font.size = Pt(9)
+            
+            # Summary
+            summary = analysis.get("summary", "No summary available")
+            summary_run = email_para.add_run(f"Summary: {summary}\n")
+            summary_run.font.size = Pt(9)
+            summary_run.italic = True
+            
+            # Action Item
+            action = analysis.get("action_item", "No action required")
+            action_run = email_para.add_run(f"Action: {action}\n")
+            action_run.font.size = Pt(9)
+            action_run.font.color.rgb = RGBColor(26, 86, 219)
+            action_run.font.bold = True
+            
+            # Preview
+            preview = email.get("bodyPreview", "")[:200]
+            preview_run = email_para.add_run(f"Preview: {preview}...\n")
+            preview_run.font.size = Pt(9)
+            preview_run.font.color.rgb = RGBColor(107, 114, 128)
+        
+        # Save
+        output_path = "/tmp/weekly_email_report.docx"
+        doc.save(output_path)
+        return output_path
     
-    # Save
-    output_path = "/tmp/weekly_email_report.docx"
-    doc.save(output_path)
-    return output_path
+    except Exception as e:
+        st.error(f"Error generating document: {str(e)}")
+        return None
 
 # ---------------------------------------------------
 # UI
@@ -314,8 +356,8 @@ else:
                         # Analyze emails
                         with st.spinner("🤖 Analyzing emails with AI..."):
                             emails_with_analysis = []
-                            
                             progress_bar = st.progress(0)
+                            
                             for idx, email in enumerate(emails_raw):
                                 analysis = analyze_email(email)
                                 emails_with_analysis.append({
@@ -355,15 +397,17 @@ else:
                         with st.spinner("📄 Generating Word document..."):
                             docx_path = generate_docx(emails_with_analysis)
                         
-                        # Download button
-                        with open(docx_path, "rb") as f:
-                            st.download_button(
-                                label="📥 Download Report (DOCX)",
-                                data=f.read(),
-                                file_name=f"email_report_{datetime.now().strftime('%Y%m%d')}.docx",
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            )
-                        st.success("✅ Document generated successfully!")
+                        if docx_path and os.path.exists(docx_path):
+                            with open(docx_path, "rb") as f:
+                                st.download_button(
+                                    label="📥 Download Report (DOCX)",
+                                    data=f.read(),
+                                    file_name=f"email_report_{datetime.now().strftime('%Y%m%d')}.docx",
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                )
+                            st.success("✅ Document generated successfully!")
+                        else:
+                            st.error("❌ Failed to generate document")
                 
                 elif response.status_code == 401:
                     st.error("❌ Session expired. Please login again.")
