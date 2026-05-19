@@ -217,56 +217,73 @@ def auto_fit_text(cell, text, base_size=10):
 # AI ANALYSIS
 # ---------------------------------------------------
 def analyze_email(email: dict) -> dict:
-
-    prompt = f"""
-You are an executive email analyst.
-
-Analyse the following email and return ONLY valid JSON.
+    prompt = f"""You are an executive email analyst. Analyze the following email and return ONLY valid JSON with no explanation, no markdown, no code blocks.
 
 Subject: {email.get("subject", "(no subject)")}
-
-From: {
-    email.get("from", {})
-    .get("emailAddress", {})
-    .get("address", "Unknown")
-}
-
+From: {email.get("from", {}).get("emailAddress", {}).get("address", "Unknown")}
 Preview: {email.get("bodyPreview", "")[:500]}
 
-Return JSON in this exact format:
-
+Return this exact JSON structure:
 {{
-  "priority": "Critical|High|Medium|Low",
-  "summary": "Short professional summary",
+  "priority": "Critical",
+  "summary": "Short professional summary here",
   "action_item": "One action item or No action required",
-  "sentiment": "Positive|Neutral|Negative|Urgent",
-  "category": "Meeting|Finance|Support|Project|Legal|Other"
+  "sentiment": "Positive",
+  "category": "Meeting"
 }}
-"""
+
+priority must be one of: Critical, High, Medium, Low
+sentiment must be one of: Positive, Neutral, Negative, Urgent
+category must be one of: Meeting, Finance, Support, Project, Legal, Other"""
 
     try:
-
         response = groq_client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
+                {
+                    "role": "system",
+                    "content": "You are a JSON-only API. Never output markdown, code blocks, or explanations. Output raw JSON only."
+                },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            temperature=0.2
+            temperature=0.1
         )
 
         raw = response.choices[0].message.content.strip()
 
-        raw = raw.replace("```json", "")
-        raw = raw.replace("```", "")
-        raw = raw.strip()
+        # Robustly strip markdown fences
+        import re
+        raw = re.sub(r"```(?:json)?", "", raw).strip()
 
-        return json.loads(raw)
+        # Extract JSON object if there's surrounding text
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if match:
+            raw = match.group(0)
 
-    except Exception:
+        result = json.loads(raw)
 
+        # Validate required keys exist
+        required_keys = ["priority", "summary", "action_item", "sentiment", "category"]
+        for key in required_keys:
+            if key not in result:
+                result[key] = "Unknown" if key != "action_item" else "Review manually."
+
+        return result
+
+    except json.JSONDecodeError as e:
+        st.warning(f"⚠️ JSON parse error for email '{email.get('subject', '')}': {e}")
+        return {
+            "priority": "Medium",
+            "summary": "AI summary could not be generated.",
+            "action_item": "Review manually.",
+            "sentiment": "Neutral",
+            "category": "Other"
+        }
+    except Exception as e:
+        st.warning(f"⚠️ AI analysis failed: {e}")
         return {
             "priority": "Medium",
             "summary": "AI summary could not be generated.",
