@@ -1,4 +1,6 @@
-streamlit
-msal
-requests
-PyJWT
+streamlit==1.28.1
+requests==2.31.0
+msal==1.24.1
+groq==0.4.1
+python-docx==0.8.11
+python-dotenv==1.0.0
