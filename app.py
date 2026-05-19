@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import html
 import json
-import os
+
 from msal import PublicClientApplication
 from datetime import datetime, timedelta, timezone
 from groq import Groq
@@ -40,7 +40,10 @@ st.set_page_config(
 )
 
 st.title("📄 Outlook AI Report Generator")
-st.write("Generate professional AI-powered Outlook email reports.")
+
+st.write(
+    "Generate AI-powered DOCX reports from your Outlook emails."
+)
 
 # ---------------------------------------------------
 # AI ANALYSIS
@@ -50,13 +53,20 @@ def analyze_email(email: dict) -> dict:
     prompt = f"""
 You are an executive email analyst.
 
-Analyse the email and return ONLY valid JSON.
+Analyse the following email and return ONLY valid JSON.
 
-Subject: {email.get('subject', '(no subject)')}
-From: {email.get('from', {}).get('emailAddress', {}).get('address', 'Unknown')}
-Preview: {email.get('bodyPreview', '')[:500]}
+Subject: {email.get("subject", "(no subject)")}
 
-Return:
+From: {
+    email.get("from", {})
+    .get("emailAddress", {})
+    .get("address", "Unknown")
+}
+
+Preview: {email.get("bodyPreview", "")[:500]}
+
+Return JSON in this exact format:
+
 {{
   "priority": "Critical|High|Medium|Low",
   "summary": "Short professional summary",
@@ -79,7 +89,8 @@ Return:
             temperature=0.2
         )
 
-        raw = response.choices[0].message.content
+        raw = response.choices[0].message.content.strip()
+
         raw = raw.replace("```json", "")
         raw = raw.replace("```", "")
         raw = raw.strip()
@@ -97,7 +108,7 @@ Return:
         }
 
 # ---------------------------------------------------
-# OVERVIEW
+# WEEKLY OVERVIEW
 # ---------------------------------------------------
 def weekly_overview(emails, analyses):
 
@@ -118,12 +129,16 @@ def weekly_overview(emails, analyses):
     ]
 
     prompt = f"""
-Write a professional executive email digest.
+Write a professional executive overview paragraph.
 
 Emails analysed: {len(emails)}
+
 Critical emails: {critical}
+
 High priority emails: {high}
-Key actions: {'; '.join(actions[:5]) if actions else 'None'}
+
+Key actions:
+{' ; '.join(actions[:5]) if actions else 'None'}
 
 Return plain professional paragraph only.
 """
@@ -162,16 +177,20 @@ def generate_docx(emails, analyses, overview_text):
     title.runs[0].font.size = Pt(24)
 
     doc.add_paragraph(
-        f"Generated: {datetime.utcnow().strftime('%d %b %Y %H:%M UTC')}"
+        f"Generated: "
+        f"{datetime.utcnow().strftime('%d %b %Y %H:%M UTC')}"
     )
 
     doc.add_paragraph(
         f"Total Emails Analysed: {len(emails)}"
     )
 
+    # Overview
     doc.add_heading("Executive Overview", level=2)
+
     doc.add_paragraph(overview_text)
 
+    # Email Analysis
     doc.add_heading("Email Analysis", level=2)
 
     for idx, (email, analysis) in enumerate(
@@ -187,24 +206,46 @@ def generate_docx(emails, analyses, overview_text):
             .get("address", "Unknown")
         )
 
-        received = email.get("receivedDateTime", "")
+        received = email.get(
+            "receivedDateTime",
+            ""
+        )
 
-        preview = email.get("bodyPreview", "")
+        preview = email.get(
+            "bodyPreview",
+            ""
+        )
 
-        doc.add_heading(f"#{idx} - {subject}", level=3)
+        doc.add_heading(
+            f"#{idx} - {subject}",
+            level=3
+        )
 
         doc.add_paragraph(f"From: {sender}")
-        doc.add_paragraph(f"Received: {received}")
-        doc.add_paragraph(f"Priority: {analysis.get('priority')}")
-        doc.add_paragraph(f"Category: {analysis.get('category')}")
-        doc.add_paragraph(f"Sentiment: {analysis.get('sentiment')}")
+
+        doc.add_paragraph(
+            f"Received: {received}"
+        )
+
+        doc.add_paragraph(
+            f"Priority: {analysis.get('priority')}"
+        )
+
+        doc.add_paragraph(
+            f"Category: {analysis.get('category')}"
+        )
+
+        doc.add_paragraph(
+            f"Sentiment: {analysis.get('sentiment')}"
+        )
 
         doc.add_paragraph(
             f"Summary: {analysis.get('summary')}"
         )
 
         doc.add_paragraph(
-            f"Action Item: {analysis.get('action_item')}"
+            f"Action Item: "
+            f"{analysis.get('action_item')}"
         )
 
         doc.add_paragraph(
@@ -224,35 +265,53 @@ def generate_docx(emails, analyses, overview_text):
 # ---------------------------------------------------
 if "access_token" not in st.session_state:
 
-    st.info("🔐 Login with Microsoft")
+    st.info(
+        "🔓 Login with your Microsoft account to continue"
+    )
 
-    if st.button("Login with Microsoft"):
+    if st.button("🔐 Login with Microsoft"):
 
         try:
 
-            flow = app.initiate_device_flow(scopes=SCOPES)
+            flow = app.initiate_device_flow(
+                scopes=SCOPES
+            )
 
             if "user_code" not in flow:
-                st.error("Device flow failed")
+
+                st.error("❌ Device flow failed")
+
                 st.stop()
+
+            st.markdown("### 👇 Complete Login")
 
             st.code(flow["user_code"])
 
-            st.write(
-                f"Visit: {flow['verification_uri']}"
+            st.markdown(
+                f"""
+Visit: **{flow['verification_uri']}**
+
+Enter the code above.
+"""
             )
 
-            with st.spinner("Waiting for authentication..."):
+            with st.spinner(
+                "Waiting for login..."
+            ):
 
-                result = app.acquire_token_by_device_flow(flow)
+                result = app.acquire_token_by_device_flow(
+                    flow
+                )
 
             if "access_token" in result:
 
-                st.session_state["access_token"] = result[
-                    "access_token"
-                ]
+                st.session_state["access_token"] = (
+                    result["access_token"]
+                )
 
-                st.success("Login successful")
+                st.success(
+                    "✅ Login successful"
+                )
 
                 st.rerun()
 
@@ -266,7 +325,8 @@ if "access_token" not in st.session_state:
                 )
 
         except Exception as e:
-            st.error(str(e))
+
+            st.error(f"❌ {str(e)}")
 
 # ---------------------------------------------------
 # AFTER LOGIN
@@ -275,7 +335,7 @@ else:
 
     access_token = st.session_state["access_token"]
 
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([3, 1])
 
     with col1:
         generate_btn = st.button(
@@ -283,18 +343,25 @@ else:
         )
 
     with col2:
-        logout_btn = st.button("🚪 Logout")
+        logout_btn = st.button(
+            "🚪 Logout"
+        )
 
+    # Logout
     if logout_btn:
 
         st.session_state.clear()
+
         st.rerun()
 
+    # Generate Report
     if generate_btn:
 
         try:
 
-            with st.spinner("Fetching emails..."):
+            with st.spinner(
+                "📬 Fetching emails..."
+            ):
 
                 last_week = (
                     datetime.now(timezone.utc)
@@ -309,7 +376,8 @@ else:
                 )
 
                 headers = {
-                    "Authorization": f"Bearer {access_token}"
+                    "Authorization":
+                    f"Bearer {access_token}"
                 }
 
                 response = requests.get(
@@ -318,23 +386,61 @@ else:
                     timeout=20
                 )
 
-                if response.status_code != 200:
+                # Unauthorized
+                if response.status_code == 401:
 
                     st.error(
-                        f"Graph API Error: {response.status_code}"
+                        "❌ Session expired. Please login again."
                     )
+
+                    st.session_state.clear()
 
                     st.stop()
 
-                emails = response.json().get("value", [])
+                # Other errors
+                if response.status_code != 200:
 
-            st.success(f"{len(emails)} emails fetched")
+                    st.error(
+                        f"❌ Graph API Error: "
+                        f"{response.status_code}"
+                    )
 
+                    try:
+                        st.json(response.json())
+                    except Exception:
+                        st.write(response.text)
+
+                    st.stop()
+
+                emails = response.json().get(
+                    "value",
+                    []
+                )
+
+            st.success(
+                f"✅ {len(emails)} emails fetched"
+            )
+
+            if not emails:
+
+                st.info(
+                    "No emails found in last 7 days"
+                )
+
+                st.stop()
+
+            # ---------------------------------------------------
+            # AI ANALYSIS
+            # ---------------------------------------------------
             analyses = []
 
             progress = st.progress(0)
 
-            with st.spinner("Analysing emails using AI..."):
+            with st.spinner(
+                "🤖 Analysing emails using AI..."
+            ):
+
+                total = len(emails)
 
                 for idx, email in enumerate(emails):
 
@@ -343,15 +449,27 @@ else:
                     analyses.append(result)
 
                     progress.progress(
-                        (idx + 1) / len(emails)
+                        (idx + 1) / total
                     )
 
-            with st.spinner("Generating DOCX report..."):
+            # ---------------------------------------------------
+            # OVERVIEW
+            # ---------------------------------------------------
+            with st.spinner(
+                "🧠 Generating executive overview..."
+            ):
 
                 overview = weekly_overview(
                     emails,
                     analyses
                 )
+
+            # ---------------------------------------------------
+            # DOCX REPORT
+            # ---------------------------------------------------
+            with st.spinner(
+                "📄 Generating DOCX report..."
+            ):
 
                 report_file = generate_docx(
                     emails,
@@ -359,15 +477,25 @@ else:
                     overview
                 )
 
-            st.success("AI Report Generated Successfully")
+            st.success(
+                "✅ AI Report Generated Successfully"
+            )
 
-            # Preview emails
-            st.subheader("Email Preview")
+            # ---------------------------------------------------
+            # PREVIEW
+            # ---------------------------------------------------
+            st.subheader("📩 Email Preview")
 
-            for email, analysis in zip(emails[:5], analyses[:5]):
+            for email, analysis in zip(
+                emails[:5],
+                analyses[:5]
+            ):
 
                 subject = html.escape(
-                    email.get("subject", "No Subject")
+                    email.get(
+                        "subject",
+                        "No Subject"
+                    )
                 )
 
                 sender = html.escape(
@@ -376,32 +504,46 @@ else:
                     .get("address", "Unknown")
                 )
 
-                summary = analysis.get("summary")
+                summary = analysis.get(
+                    "summary",
+                    ""
+                )
 
-                st.markdown(f"""
+                st.markdown(
+                    f"""
 ### 📩 {subject}
+
 **From:** {sender}
 
 **AI Summary:** {summary}
 
 ---
-""")
+"""
+                )
 
-            # Download button
+            # ---------------------------------------------------
+            # DOWNLOAD BUTTON
+            # ---------------------------------------------------
             with open(report_file, "rb") as file:
 
                 st.download_button(
                     label="⬇️ Download DOCX Report",
                     data=file,
                     file_name=report_file,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    mime=(
+                        "application/vnd.openxmlformats-officedocument"
+                        ".wordprocessingml.document"
+                    )
                 )
 
         except requests.exceptions.Timeout:
-            st.error("Request timeout")
+
+            st.error("⏱️ Request timeout")
 
         except requests.exceptions.ConnectionError:
-            st.error("Network error")
+
+            st.error("🌐 Network connection error")
 
         except Exception as e:
-            st.error(str(e))
+
+            st.error(f"❌ {str(e)}")
