@@ -1,4 +1,3 @@
-
 import streamlit as st
 import requests
 import html
@@ -112,6 +111,8 @@ def set_cell_margins(cell, top=60, bottom=60, left=100, right=100):
 
 
 def set_col_widths(table, widths):
+    table.autofit = False
+
     for row in table.rows:
         for idx, width in enumerate(widths):
             row.cells[idx].width = width
@@ -280,6 +281,7 @@ def generate_docx(emails, analyses, overview_text):
     # ---------------------------------------------------
     tbl = doc.add_table(rows=3, cols=1)
     tbl.style = "Table Grid"
+    set_col_widths(tbl, [Inches(6.8)])
 
     c0 = tbl.cell(0, 0)
     set_cell_bg(c0, NAVY)
@@ -327,6 +329,7 @@ def generate_docx(emails, analyses, overview_text):
 
     kpi = doc.add_table(rows=2, cols=4)
     kpi.style = "Table Grid"
+    set_col_widths(kpi, [Inches(1.7), Inches(1.7), Inches(1.7), Inches(1.7)])
 
     values = [
         (str(len(emails)), "Emails", BLUE),
@@ -373,6 +376,7 @@ def generate_docx(emails, analyses, overview_text):
 
     ov = doc.add_table(rows=1, cols=2)
     ov.style = "Table Grid"
+    set_col_widths(ov, [Inches(0.15), Inches(6.65)])
 
     left = ov.cell(0, 0)
     right = ov.cell(0, 1)
@@ -428,6 +432,7 @@ def generate_docx(emails, analyses, overview_text):
         # Header card
         card = doc.add_table(rows=1, cols=3)
         card.style = "Table Grid"
+        set_col_widths(card, [Inches(0.6), Inches(5.2), Inches(1.0)])
 
         c1 = card.cell(0, 0)
         c2 = card.cell(0, 1)
@@ -450,6 +455,7 @@ def generate_docx(emails, analyses, overview_text):
         # Meta table
         meta = doc.add_table(rows=2, cols=4)
         meta.style = "Table Grid"
+        set_col_widths(meta, [Inches(1.8), Inches(1.8), Inches(1.6), Inches(1.6)])
 
         labels = [
             "FROM",
@@ -485,6 +491,7 @@ def generate_docx(emails, analyses, overview_text):
         # Body content
         body = doc.add_table(rows=3, cols=2)
         body.style = "Table Grid"
+        set_col_widths(body, [Inches(1.7), Inches(5.1)])
 
         rows = [
             (
@@ -535,6 +542,7 @@ def generate_docx(emails, analyses, overview_text):
 
     actions_table = doc.add_table(rows=1, cols=4)
     actions_table.style = "Table Grid"
+    set_col_widths(actions_table, [Inches(2.6), Inches(1.0), Inches(1.2), Inches(2.0)])
 
     headers = [
         "Subject",
