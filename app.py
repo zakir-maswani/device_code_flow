@@ -9,15 +9,15 @@ from groq import Groq
 
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches, Cm
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
 # ---------------------------------------------------
 # CONFIG
 # ---------------------------------------------------
-CLIENT_ID = st.secrets["CLIENT_ID"]
-GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+CLIENT_ID = st.secrets.get("CLIENT_ID", "test_client")
+GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "test_key")
 
 AUTHORITY = "https://login.microsoftonline.com/consumers"
 
@@ -42,10 +42,56 @@ st.set_page_config(
     layout="wide"
 )
 
+# Custom CSS for better styling
+st.markdown("""
+<style>
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+        margin: 10px 0;
+    }
+    .metric-value {
+        font-size: 32px;
+        font-weight: bold;
+        margin: 10px 0;
+    }
+    .metric-label {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+    .email-preview {
+        background: #f8f9fa;
+        padding: 15px;
+        border-left: 4px solid #667eea;
+        border-radius: 4px;
+        margin: 10px 0;
+    }
+    .priority-critical {
+        color: #ef4444;
+        font-weight: bold;
+    }
+    .priority-high {
+        color: #f59e0b;
+        font-weight: bold;
+    }
+    .priority-medium {
+        color: #10b981;
+        font-weight: bold;
+    }
+    .priority-low {
+        color: #6b7a8e;
+        font-weight: bold;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.title("📄 Outlook AI Report Generator")
 
 st.write(
-    "Generate AI-powered DOCX reports from your Outlook emails."
+    "🚀 Generate professional AI-powered DOCX reports from your Outlook emails with automatic formatting."
 )
 
 # ---------------------------------------------------
@@ -83,7 +129,7 @@ PRIORITY_THEME = {
 }
 
 # ---------------------------------------------------
-# DOCX HELPERS
+# DOCX HELPERS WITH DYNAMIC TEXT SIZING
 # ---------------------------------------------------
 def hex_rgb(rgb):
     return f"{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}"
@@ -118,14 +164,15 @@ def set_col_widths(table, widths):
             row.cells[idx].width = width
 
 
-def add_horizontal_rule(doc):
+def add_horizontal_rule(doc, color='D1D5DB', size=6):
     p = doc.add_paragraph()
     pPr = p._p.get_or_add_pPr()
     pBdr = OxmlElement('w:pBdr')
     bottom = OxmlElement('w:bottom')
     bottom.set(qn('w:val'), 'single')
-    bottom.set(qn('w:sz'), '4')
-    bottom.set(qn('w:color'), 'D1D5DB')
+    bottom.set(qn('w:sz'), str(size))
+    bottom.set(qn('w:color'), color)
+    bottom.set(qn('w:space'), '1')
     pBdr.append(bottom)
     pPr.append(pBdr)
 
@@ -143,6 +190,28 @@ def badge_cell(cell, text, bg, txt):
 def priority_badge(cell, priority):
     bg, _, txt = PRIORITY_THEME.get(priority, PRIORITY_THEME['Low'])
     badge_cell(cell, priority, bg, txt)
+
+
+def auto_fit_text(cell, text, base_size=10):
+    """Auto-fit text size based on content length"""
+    p = cell.paragraphs[0]
+    
+    # Calculate appropriate size based on text length
+    if len(text) > 200:
+        font_size = Pt(8)
+    elif len(text) > 100:
+        font_size = Pt(9)
+    else:
+        font_size = Pt(base_size)
+    
+    # Handle text wrapping
+    p.word_wrap = True
+    run = p.add_run(text)
+    run.font.size = font_size
+    run.font.color.rgb = TEXT
+    
+    return p, run
+
 
 # ---------------------------------------------------
 # AI ANALYSIS
@@ -228,7 +297,7 @@ def weekly_overview(emails, analyses):
     ]
 
     prompt = f"""
-Write a professional executive overview paragraph.
+Write a professional executive overview paragraph (max 4 sentences).
 
 Emails analysed: {len(emails)}
 
@@ -262,7 +331,7 @@ Return plain professional paragraph only.
         return "Overview generation failed."
 
 # ---------------------------------------------------
-# PROFESSIONAL DOCX GENERATOR
+# PROFESSIONAL DOCX GENERATOR WITH DYNAMIC SIZING
 # ---------------------------------------------------
 def generate_docx(emails, analyses, overview_text):
 
@@ -271,40 +340,46 @@ def generate_docx(emails, analyses, overview_text):
     section = doc.sections[0]
     section.page_width = Cm(21)
     section.page_height = Cm(29.7)
-    section.left_margin = Cm(1.8)
-    section.right_margin = Cm(1.8)
+    section.left_margin = Cm(1.5)
+    section.right_margin = Cm(1.5)
     section.top_margin = Cm(1.5)
-    section.bottom_margin = Cm(2)
+    section.bottom_margin = Cm(1.5)
 
     # ---------------------------------------------------
     # COVER HEADER
     # ---------------------------------------------------
     tbl = doc.add_table(rows=3, cols=1)
     tbl.style = "Table Grid"
-    set_col_widths(tbl, [Inches(6.8)])
+    set_col_widths(tbl, [Inches(7.0)])
 
+    # Header row 1 - Badge
     c0 = tbl.cell(0, 0)
     set_cell_bg(c0, NAVY)
+    set_cell_margins(c0, top=100, bottom=60, left=150, right=150)
     r = c0.paragraphs[0].add_run("OUTLOOK AI REPORT")
     r.bold = True
     r.font.size = Pt(9)
     r.font.color.rgb = BLUE
 
+    # Header row 2 - Title
     c1 = tbl.cell(1, 0)
     set_cell_bg(c1, NAVY)
-    r = c1.paragraphs[0].add_run(
-        "Weekly Email Intelligence Report"
-    )
+    set_cell_margins(c1, top=120, bottom=120, left=150, right=150)
+    p1 = c1.paragraphs[0]
+    p1.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+    r = p1.add_run("Weekly Email Intelligence Report")
     r.bold = True
-    r.font.size = Pt(24)
+    r.font.size = Pt(26)
     r.font.color.rgb = WHITE
 
+    # Header row 3 - Date
     c2 = tbl.cell(2, 0)
     set_cell_bg(c2, NAVY)
+    set_cell_margins(c2, top=80, bottom=100, left=150, right=150)
     r = c2.paragraphs[0].add_run(
-        datetime.utcnow().strftime('%d %b %Y')
+        datetime.utcnow().strftime('%d %B %Y')
     )
-    r.font.size = Pt(10)
+    r.font.size = Pt(11)
     r.font.color.rgb = WHITE
 
     doc.add_paragraph()
@@ -329,10 +404,10 @@ def generate_docx(emails, analyses, overview_text):
 
     kpi = doc.add_table(rows=2, cols=4)
     kpi.style = "Table Grid"
-    set_col_widths(kpi, [Inches(1.7), Inches(1.7), Inches(1.7), Inches(1.7)])
+    set_col_widths(kpi, [Inches(1.75), Inches(1.75), Inches(1.75), Inches(1.75)])
 
     values = [
-        (str(len(emails)), "Emails", BLUE),
+        (str(len(emails)), "Total Emails", BLUE),
         (str(critical), "Critical", RED),
         (str(high), "High Priority", AMBER),
         (str(actions), "Action Items", GREEN)
@@ -344,14 +419,16 @@ def generate_docx(emails, analyses, overview_text):
         cell2 = kpi.cell(1, idx)
 
         set_cell_bg(cell1, WHITE)
-        set_cell_bg(cell2, WHITE)
+        set_cell_bg(cell2, SURFACE)
+        set_cell_margins(cell1, top=80, bottom=60, left=80, right=80)
+        set_cell_margins(cell2, top=60, bottom=80, left=80, right=80)
 
         p1 = cell1.paragraphs[0]
         p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         r1 = p1.add_run(num)
         r1.bold = True
-        r1.font.size = Pt(22)
+        r1.font.size = Pt(24)
         r1.font.color.rgb = color
 
         p2 = cell2.paragraphs[0]
@@ -367,28 +444,33 @@ def generate_docx(emails, analyses, overview_text):
     # OVERVIEW
     # ---------------------------------------------------
     h = doc.add_paragraph()
+    h.paragraph_format.space_before = Pt(12)
+    h.paragraph_format.space_after = Pt(6)
     rh = h.add_run("EXECUTIVE OVERVIEW")
     rh.bold = True
-    rh.font.size = Pt(12)
+    rh.font.size = Pt(13)
     rh.font.color.rgb = NAVY
 
-    add_horizontal_rule(doc)
+    add_horizontal_rule(doc, color='1A56DB', size=8)
 
     ov = doc.add_table(rows=1, cols=2)
     ov.style = "Table Grid"
-    set_col_widths(ov, [Inches(0.15), Inches(6.65)])
+    set_col_widths(ov, [Inches(0.15), Inches(6.85)])
 
     left = ov.cell(0, 0)
     right = ov.cell(0, 1)
 
     set_cell_bg(left, BLUE)
     set_cell_bg(right, WHITE)
+    set_cell_margins(right, top=100, bottom=100, left=120, right=120)
 
     left.width = Inches(0.1)
 
     pr = right.paragraphs[0]
+    pr.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+    pr.alignment = WD_ALIGN_PARAGRAPH.LEFT
     rr = pr.add_run(overview_text)
-    rr.font.size = Pt(10)
+    rr.font.size = Pt(11)
     rr.font.color.rgb = TEXT
 
     doc.add_paragraph()
@@ -397,19 +479,21 @@ def generate_docx(emails, analyses, overview_text):
     # EMAIL ANALYSIS
     # ---------------------------------------------------
     heading = doc.add_paragraph()
+    heading.paragraph_format.space_before = Pt(12)
+    heading.paragraph_format.space_after = Pt(6)
     rh = heading.add_run("EMAIL ANALYSIS")
     rh.bold = True
-    rh.font.size = Pt(12)
+    rh.font.size = Pt(13)
     rh.font.color.rgb = NAVY
 
-    add_horizontal_rule(doc)
+    add_horizontal_rule(doc, color='1A56DB', size=8)
 
     for idx, (email, analysis) in enumerate(
         zip(emails, analyses),
         start=1
     ):
 
-        subject = email.get("subject", "No Subject")
+        subject = email.get("subject", "No Subject")[:100]
 
         sender = (
             email.get("from", {})
@@ -420,19 +504,19 @@ def generate_docx(emails, analyses, overview_text):
         received = email.get(
             "receivedDateTime",
             ""
-        )
+        )[:10]
 
         preview = email.get(
             "bodyPreview",
             ""
-        )[:300]
+        )[:250]
 
         priority = analysis.get("priority", "Medium")
 
         # Header card
         card = doc.add_table(rows=1, cols=3)
         card.style = "Table Grid"
-        set_col_widths(card, [Inches(0.6), Inches(5.2), Inches(1.0)])
+        set_col_widths(card, [Inches(0.6), Inches(5.4), Inches(1.0)])
 
         c1 = card.cell(0, 0)
         c2 = card.cell(0, 1)
@@ -440,12 +524,17 @@ def generate_docx(emails, analyses, overview_text):
 
         set_cell_bg(c1, SURFACE)
         set_cell_bg(c2, SURFACE)
+        set_cell_margins(c1, top=80, bottom=80, left=80, right=80)
+        set_cell_margins(c2, top=80, bottom=80, left=100, right=100)
 
         r = c1.paragraphs[0].add_run(f"#{idx}")
         r.bold = True
+        r.font.size = Pt(11)
         r.font.color.rgb = MUTED
 
-        r = c2.paragraphs[0].add_run(subject)
+        p2 = c2.paragraphs[0]
+        p2.word_wrap = True
+        r = p2.add_run(subject)
         r.bold = True
         r.font.size = Pt(11)
         r.font.color.rgb = TEXT
@@ -465,10 +554,10 @@ def generate_docx(emails, analyses, overview_text):
         ]
 
         values = [
-            sender,
+            sender[:40],
             received,
-            analysis.get("category"),
-            analysis.get("sentiment")
+            analysis.get("category", ""),
+            analysis.get("sentiment", "")
         ]
 
         for i in range(4):
@@ -478,29 +567,33 @@ def generate_docx(emails, analyses, overview_text):
 
             set_cell_bg(top, SURFACE)
             set_cell_bg(bottom, WHITE)
+            set_cell_margins(top, top=60, bottom=40, left=80, right=80)
+            set_cell_margins(bottom, top=60, bottom=80, left=80, right=80)
 
             rt = top.paragraphs[0].add_run(labels[i])
             rt.bold = True
             rt.font.size = Pt(8)
             rt.font.color.rgb = MUTED
 
-            rb = bottom.paragraphs[0].add_run(str(values[i]))
-            rb.font.size = Pt(9)
-            rb.font.color.rgb = TEXT
+            rb = bottom.paragraphs[0]
+            rb.word_wrap = True
+            r = rb.add_run(str(values[i]))
+            r.font.size = Pt(9)
+            r.font.color.rgb = TEXT
 
         # Body content
         body = doc.add_table(rows=3, cols=2)
         body.style = "Table Grid"
-        set_col_widths(body, [Inches(1.7), Inches(5.1)])
+        set_col_widths(body, [Inches(1.7), Inches(5.2)])
 
         rows = [
             (
                 "AI SUMMARY",
-                analysis.get("summary")
+                analysis.get("summary", "")[:180]
             ),
             (
                 "ACTION REQUIRED",
-                analysis.get("action_item")
+                analysis.get("action_item", "")[:120]
             ),
             (
                 "EMAIL PREVIEW",
@@ -515,15 +608,20 @@ def generate_docx(emails, analyses, overview_text):
 
             set_cell_bg(lc, SURFACE)
             set_cell_bg(vc, WHITE)
+            set_cell_margins(lc, top=70, bottom=70, left=100, right=80)
+            set_cell_margins(vc, top=70, bottom=70, left=100, right=100)
 
             rl = lc.paragraphs[0].add_run(label)
             rl.bold = True
             rl.font.size = Pt(8)
             rl.font.color.rgb = MUTED
 
-            rv = vc.paragraphs[0].add_run(str(value))
-            rv.font.size = Pt(9)
-            rv.font.color.rgb = TEXT
+            rv = vc.paragraphs[0]
+            rv.word_wrap = True
+            rv.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+            r = rv.add_run(str(value))
+            r.font.size = Pt(9)
+            r.font.color.rgb = TEXT
 
         doc.add_paragraph()
 
@@ -533,16 +631,18 @@ def generate_docx(emails, analyses, overview_text):
     doc.add_page_break()
 
     action_heading = doc.add_paragraph()
+    action_heading.paragraph_format.space_before = Pt(12)
+    action_heading.paragraph_format.space_after = Pt(6)
     ra = action_heading.add_run("ACTION ITEMS SUMMARY")
     ra.bold = True
     ra.font.size = Pt(14)
     ra.font.color.rgb = NAVY
 
-    add_horizontal_rule(doc)
+    add_horizontal_rule(doc, color='1A56DB', size=8)
 
     actions_table = doc.add_table(rows=1, cols=4)
     actions_table.style = "Table Grid"
-    set_col_widths(actions_table, [Inches(2.6), Inches(1.0), Inches(1.2), Inches(2.0)])
+    set_col_widths(actions_table, [Inches(2.6), Inches(1.0), Inches(1.2), Inches(2.2)])
 
     headers = [
         "Subject",
@@ -556,10 +656,11 @@ def generate_docx(emails, analyses, overview_text):
         cell = actions_table.cell(0, idx)
 
         set_cell_bg(cell, NAVY)
+        set_cell_margins(cell, top=80, bottom=80, left=100, right=100)
 
         r = cell.paragraphs[0].add_run(h)
         r.bold = True
-        r.font.size = Pt(9)
+        r.font.size = Pt(10)
         r.font.color.rgb = WHITE
 
     for email, analysis in zip(emails, analyses):
@@ -568,11 +669,29 @@ def generate_docx(emails, analyses, overview_text):
             continue
 
         row = actions_table.add_row().cells
+        
+        for cell in row:
+            set_cell_margins(cell, top=70, bottom=70, left=100, right=100)
 
-        row[0].text = email.get("subject", "")[:50]
-        row[1].text = analysis.get("priority", "")
-        row[2].text = analysis.get("category", "")
-        row[3].text = analysis.get("action_item", "")
+        p0 = row[0].paragraphs[0]
+        p0.word_wrap = True
+        p0.add_run(email.get("subject", "")[:50])
+        p0.runs[0].font.size = Pt(9)
+
+        p1 = row[1].paragraphs[0]
+        p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p1.add_run(analysis.get("priority", ""))
+        p1.runs[0].font.size = Pt(9)
+
+        p2 = row[2].paragraphs[0]
+        p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p2.add_run(analysis.get("category", ""))
+        p2.runs[0].font.size = Pt(9)
+
+        p3 = row[3].paragraphs[0]
+        p3.word_wrap = True
+        p3.add_run(analysis.get("action_item", "")[:60])
+        p3.runs[0].font.size = Pt(9)
 
     output_file = "weekly_ai_report.docx"
 
@@ -589,7 +708,7 @@ if "access_token" not in st.session_state:
         "🔓 Login with your Microsoft account to continue"
     )
 
-    if st.button("🔐 Login with Microsoft"):
+    if st.button("🔐 Login with Microsoft", use_container_width=True):
 
         try:
 
@@ -659,12 +778,14 @@ else:
 
     with col1:
         generate_btn = st.button(
-            "📄 Generate AI Report"
+            "📄 Generate AI Report",
+            use_container_width=True
         )
 
     with col2:
         logout_btn = st.button(
-            "🚪 Logout"
+            "🚪 Logout",
+            use_container_width=True
         )
 
     # Logout
@@ -777,7 +898,7 @@ else:
                 )
 
             with st.spinner(
-                "📄 Generating DOCX report..."
+                "📄 Generating professional DOCX report..."
             ):
 
                 report_file = generate_docx(
@@ -790,12 +911,61 @@ else:
                 "✅ AI Report Generated Successfully"
             )
 
-            st.subheader("📩 Email Preview")
+            # ---------------------------------------------------
+            # LIVE PREVIEW SECTION
+            # ---------------------------------------------------
+            st.subheader("📊 Report Preview & Statistics")
 
-            for email, analysis in zip(
-                emails[:5],
-                analyses[:5]
-            ):
+            # KPI Row
+            kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+
+            with kpi_col1:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-label">Total Emails</div>
+                    <div class="metric-value">{len(emails)}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with kpi_col2:
+                critical_count = sum(1 for a in analyses if a.get("priority") == "Critical")
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-label">Critical</div>
+                    <div class="metric-value" style="color: #ef4444;">{critical_count}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with kpi_col3:
+                high_count = sum(1 for a in analyses if a.get("priority") == "High")
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-label">High Priority</div>
+                    <div class="metric-value" style="color: #f59e0b;">{high_count}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with kpi_col4:
+                action_count = sum(1 for a in analyses if a.get("action_item") != "No action required")
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-label">Action Items</div>
+                    <div class="metric-value" style="color: #10b981;">{action_count}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.divider()
+
+            # Overview
+            st.subheader("📝 Executive Overview")
+            st.info(overview)
+
+            st.divider()
+
+            # Email Preview
+            st.subheader("📩 Top Emails Preview")
+
+            for idx, (email, analysis) in enumerate(zip(emails[:5], analyses[:5]), 1):
 
                 subject = html.escape(
                     email.get(
@@ -815,18 +985,33 @@ else:
                     ""
                 )
 
+                priority = analysis.get("priority", "Medium")
+                priority_class = f"priority-{priority.lower()}"
+
                 st.markdown(
                     f"""
-### 📩 {subject}
-
-**From:** {sender}
-
-**AI Summary:** {summary}
-
----
+<div class="email-preview">
+    <div style="display: flex; justify-content: space-between; align-items: start;">
+        <div>
+            <h4 style="margin: 0 0 8px 0;">📧 {subject}</h4>
+            <p style="margin: 4px 0; font-size: 13px; color: #666;">
+                <strong>From:</strong> {sender}
+            </p>
+            <p style="margin: 8px 0; font-size: 13px; line-height: 1.5;">
+                <strong>AI Summary:</strong> {summary}
+            </p>
+        </div>
+        <div class="{priority_class}" style="white-space: nowrap; margin-left: 16px;">
+            {priority}
+        </div>
+    </div>
+</div>
 """
-                )
+                    , unsafe_allow_html=True)
 
+            st.divider()
+
+            # Download Button
             with open(report_file, "rb") as file:
 
                 st.download_button(
@@ -836,7 +1021,8 @@ else:
                     mime=(
                         "application/vnd.openxmlformats-officedocument"
                         ".wordprocessingml.document"
-                    )
+                    ),
+                    use_container_width=True
                 )
 
         except requests.exceptions.Timeout:
