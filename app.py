@@ -217,24 +217,108 @@ def auto_fit_text(cell, text, base_size=10):
 # AI ANALYSIS
 # ---------------------------------------------------
 def analyze_email(email: dict) -> dict:
-    prompt = f"""You are an executive email analyst. Analyze the following email and return ONLY valid JSON with no explanation, no markdown, no code blocks.
+    prompt = f"""
+You are a Senior Executive Email Intelligence Analyst.
 
-Subject: {email.get("subject", "(no subject)")}
-From: {email.get("from", {}).get("emailAddress", {}).get("address", "Unknown")}
-Preview: {email.get("bodyPreview", "")[:500]}
+Analyze the email carefully and return ONLY ONE valid JSON object.
 
-Return this exact JSON structure:
+STRICT RULES:
+- Output raw JSON only.
+- Do not use markdown.
+- Do not use code blocks.
+- Do not provide explanations.
+- Do not include any text before or after the JSON.
+- Never invent facts that are not present in the email.
+- If information is unavailable, use null.
+- Summary must be concise and professional.
+- Action item must be clear and actionable.
+- If no action is required, return "No action required".
+
+EMAIL DETAILS
+-------------
+Subject: {email.get("subject", "(No Subject)")}
+Sender: {email.get("from", {}).get("emailAddress", {}).get("address", "Unknown")}
+Preview:
+{email.get("bodyPreview", "")[:1500]}
+
+ANALYSIS INSTRUCTIONS
+---------------------
+1. Determine Priority:
+   - Critical:
+       Security incidents,
+       legal escalations,
+       production outages,
+       executive escalations,
+       financial risks,
+       deadlines within 24 hours.
+   - High:
+       Customer issues,
+       approval requests,
+       urgent meetings,
+       important business decisions,
+       time-sensitive actions.
+   - Medium:
+       Standard business communications requiring attention.
+   - Low:
+       Informational emails,
+       newsletters,
+       promotions,
+       automated notifications.
+
+2. Create Executive Summary:
+   - Maximum 2 sentences.
+   - Mention key purpose and outcome.
+   - Focus on business impact.
+
+3. Extract Primary Action Item:
+   - State the most important next step.
+   - If none exists, return:
+     "No action required"
+
+4. Determine Sentiment:
+   - Positive
+   - Neutral
+   - Negative
+   - Urgent
+
+5. Categorize Email:
+   Choose ONE:
+   - Meeting
+   - Finance
+   - Support
+   - Project
+   - Legal
+   - HR
+   - Sales
+   - Security
+   - Operations
+   - Other
+
+6. Detect:
+   - Deadline or due date
+   - Approval requests
+   - Follow-up requirements
+
+7. Assess Business Risk:
+   - High
+   - Medium
+   - Low
+   - None
+
+OUTPUT JSON FORMAT
+------------------
 {{
-  "priority": "Critical",
-  "summary": "Short professional summary here",
-  "action_item": "One action item or No action required",
-  "sentiment": "Positive",
-  "category": "Meeting"
+  "priority": "Medium",
+  "summary": "Professional executive summary.",
+  "action_item": "Specific action or No action required",
+  "sentiment": "Neutral",
+  "category": "Project",
+  "deadline": null,
+  "approval_required": false,
+  "follow_up_required": false,
+  "business_risk": "Low"
 }}
-
-priority must be one of: Critical, High, Medium, Low
-sentiment must be one of: Positive, Neutral, Negative, Urgent
-category must be one of: Meeting, Finance, Support, Project, Legal, Other"""
+"""
 
     try:
         response = groq_client.chat.completions.create(
@@ -242,56 +326,74 @@ category must be one of: Meeting, Finance, Support, Project, Legal, Other"""
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a JSON-only API. Never output markdown, code blocks, or explanations. Output raw JSON only."
+                    "content": """
+You are a strict JSON API.
+
+Rules:
+- Return ONLY valid JSON.
+- Never return markdown.
+- Never return code blocks.
+- Never return explanations.
+- Never return text outside JSON.
+- Always return a single JSON object.
+- Use null for unknown values.
+- Follow the exact schema provided by the user.
+"""
                 },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            temperature=0.1
+            temperature=0.1,
+            max_tokens=400
         )
 
         raw = response.choices[0].message.content.strip()
 
-        # Robustly strip markdown fences
         import re
+        import json
+
+        # Remove markdown fences if model adds them
         raw = re.sub(r"```(?:json)?", "", raw).strip()
 
-        # Extract JSON object if there's surrounding text
+        # Extract JSON object safely
         match = re.search(r"\{.*\}", raw, re.DOTALL)
         if match:
             raw = match.group(0)
 
         result = json.loads(raw)
 
-        # Validate required keys exist
-        required_keys = ["priority", "summary", "action_item", "sentiment", "category"]
-        for key in required_keys:
-            if key not in result:
-                result[key] = "Unknown" if key != "action_item" else "Review manually."
+        # Ensure all expected fields exist
+        defaults = {
+            "priority": "Medium",
+            "summary": "No summary available.",
+            "action_item": "Review manually.",
+            "sentiment": "Neutral",
+            "category": "Other",
+            "deadline": None,
+            "approval_required": False,
+            "follow_up_required": False,
+            "business_risk": "None"
+        }
+
+        for key, value in defaults.items():
+            result.setdefault(key, value)
 
         return result
 
-    except json.JSONDecodeError as e:
-        st.warning(f"⚠️ JSON parse error for email '{email.get('subject', '')}': {e}")
+    except Exception:
         return {
             "priority": "Medium",
             "summary": "AI summary could not be generated.",
             "action_item": "Review manually.",
             "sentiment": "Neutral",
-            "category": "Other"
+            "category": "Other",
+            "deadline": None,
+            "approval_required": False,
+            "follow_up_required": False,
+            "business_risk": "None"
         }
-    except Exception as e:
-        st.warning(f"⚠️ AI analysis failed: {e}")
-        return {
-            "priority": "Medium",
-            "summary": "AI summary could not be generated.",
-            "action_item": "Review manually.",
-            "sentiment": "Neutral",
-            "category": "Other"
-        }
-
 # ---------------------------------------------------
 # WEEKLY OVERVIEW
 # ---------------------------------------------------
