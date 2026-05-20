@@ -97,23 +97,23 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("## Key Features")
     features = [
-        ("Fetches last 7 days of emails"),
-        ("AI priority classification"),
-        ("Executive summary per email"),
-        ("Action item extraction"),
-        ("KPI dashboard overview"),
-        ("Professional DOCX export"),
-        ("Secure Microsoft OAuth login"),
-        ("AI executive overview"),
+        ("★ Fetches last 7 days of emails"),
+        ("★ AI priority classification"),
+        ("★ Executive summary per email"),
+        ("★ Action item extraction"),
+        ("★ KPI dashboard overview"),
+        ("★ Professional DOCX export"),
+        ("★ Secure Microsoft OAuth login"),
+        ("★ AI executive overview"),
     ]
     for text in features:
         st.markdown(f"{text}", unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("## Priority Levels")
-    st.markdown("🔴 **Critical** — Urgent, high-risk")
-    st.markdown("🟠 **High** — Needs prompt action")
-    st.markdown("🟢 **Medium** — Standard follow-up")
-    st.markdown("⚪ **Low** — Informational only")
+    st.markdown("᪥ **Critical** ➪ Urgent, high-risk")
+    st.markdown("᪥ **High** ➪ Needs prompt action")
+    st.markdown("᪥ **Medium** ➪ Standard follow-up")
+    st.markdown("᪥ **Low** ➪ Informational only")
     st.markdown("---")
     st.caption("Powered by Groq · Microsoft Graph API")
 
