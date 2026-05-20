@@ -35,7 +35,7 @@ groq_client = Groq(
 
 # PAGE CONFIG
 st.set_page_config(
-    page_title="📧 Outlook AI Report Generator",
+    page_title="𝗢𝘂𝘁𝗹𝗼𝗼𝗸 𝗔𝗜 𝗥𝗲𝗽𝗼𝗿𝘁 𝗚𝗲𝗻𝗲𝗿𝗮𝘁𝗼𝗿",
     page_icon="⭕",
     layout="wide"
 )
