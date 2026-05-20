@@ -13,9 +13,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
-# ---------------------------------------------------
 # CONFIG
-# ---------------------------------------------------
 CLIENT_ID = st.secrets.get("CLIENT_ID", "test_client")
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "test_key")
 
@@ -31,11 +29,11 @@ app = PublicClientApplication(
     authority=AUTHORITY
 )
 
-groq_client = Groq(api_key=GROQ_API_KEY)
+groq_client = Groq(
+    api_key= GROQ_API_KEY
+)
 
-# ---------------------------------------------------
 # PAGE CONFIG
-# ---------------------------------------------------
 st.set_page_config(
     page_title="Outlook AI Report Generator",
     page_icon="📄",
@@ -93,25 +91,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------------------------------------
 # SIDEBAR
-# ---------------------------------------------------
 with st.sidebar:
     st.markdown("## 📄 AI Report Generator")
     st.markdown("---")
     st.markdown("### ✨ Key Features")
     features = [
-        ("📬", "Fetches last 7 days of emails"),
-        ("🤖", "AI priority classification"),
-        ("📝", "Executive summary per email"),
-        ("⚡", "Action item extraction"),
-        ("📊", "KPI dashboard overview"),
-        ("📁", "Professional DOCX export"),
-        ("🔒", "Secure Microsoft OAuth login"),
-        ("🧠", "AI executive overview"),
+        ("Fetches last 7 days of emails"),
+        ("AI priority classification"),
+        ("Executive summary per email"),
+        ("Action item extraction"),
+        ("KPI dashboard overview"),
+        ("Professional DOCX export"),
+        ("Secure Microsoft OAuth login"),
+        ("AI executive overview"),
     ]
-    for icon, text in features:
-        st.markdown(f"<div class='feature-item'>{icon} {text}</div>", unsafe_allow_html=True)
+    for text in features:
+        st.markdown(f"{text}", unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 📌 Priority Levels")
     st.markdown("🔴 **Critical** — Urgent, high-risk")
