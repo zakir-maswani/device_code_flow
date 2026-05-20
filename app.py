@@ -871,7 +871,7 @@ if "access_token" not in st.session_state:
                 )
 
                 st.success(
-                    "✅ Login successful"
+                    "Login successful"
                 )
 
                 st.rerun()
@@ -904,7 +904,7 @@ else:
 
     with col2:
         logout_btn = st.button(
-            "⚠Logout",
+            "Logout",
             use_container_width=True
         )
 
@@ -1026,11 +1026,11 @@ else:
                 )
 
             st.success(
-                "AI Report Generated Successfully"
+                "𝐀𝐈 𝐑𝐞𝐩𝐨𝐫𝐭 𝐆𝐞𝐧𝐞𝐫𝐚𝐭𝐞𝐝 𝐒𝐮𝐜𝐜𝐞𝐬𝐬𝐟𝐮𝐥𝐥𝐲"
             )
 
             # LIVE PREVIEW SECTION
-            st.subheader("Report Preview & Statistics")
+            st.subheader("𝐑𝐞𝐩𝐨𝐫𝐭 𝐏𝐫𝐞𝐯𝐢𝐞𝐰 𝐚𝐧𝐝 𝐒𝐭𝐚𝐭𝐢𝐬𝐭𝐢𝐜𝐬")
 
             kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
@@ -1072,7 +1072,7 @@ else:
             st.divider()
 
             # Overview
-            st.subheader("Executive Overview")
+            st.subheader("𝐄𝐱𝐞𝐜𝐮𝐭𝐢𝐯𝐞 𝐎𝐯𝐞𝐫𝐯𝐢𝐞𝐰")
             st.info(overview)
 
             st.divider()
