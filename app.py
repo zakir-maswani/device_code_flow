@@ -240,9 +240,7 @@ def auto_fit_text(cell, text, base_size=10):
     return p, run
 
 
-# ---------------------------------------------------
 # AI ANALYSIS
-# ---------------------------------------------------
 def analyze_email(email: dict) -> dict:
     prompt = f"""
 You are a Senior Executive Email Intelligence Analyst.
@@ -419,9 +417,7 @@ Rules:
             "business_risk": "None"
         }
 
-# ---------------------------------------------------
 # WEEKLY OVERVIEW
-# ---------------------------------------------------
 def weekly_overview(emails, analyses):
 
     critical = sum(
@@ -441,19 +437,19 @@ def weekly_overview(emails, analyses):
     ]
 
     prompt = f"""
-Write a professional executive overview paragraph (max 4 sentences).
+    Write a professional executive overview paragraph (max 4 sentences).
 
-Emails analysed: {len(emails)}
+    Emails analysed: {len(emails)}
 
-Critical emails: {critical}
+    Critical emails: {critical}
 
-High priority emails: {high}
+    High priority emails: {high}
 
-Key actions:
-{' ; '.join(actions[:5]) if actions else 'None'}
-
-Return plain professional paragraph only.
-"""
+    Key actions:
+    {' ; '.join(actions[:5]) if actions else 'None'}
+    
+    Return plain professional paragraph only.
+    """
 
     try:
 
@@ -474,9 +470,7 @@ Return plain professional paragraph only.
 
         return "Overview generation failed."
 
-# ---------------------------------------------------
 # PROFESSIONAL DOCX GENERATOR WITH DYNAMIC SIZING
-# ---------------------------------------------------
 def generate_docx(emails, analyses, overview_text):
 
     doc = Document()
@@ -488,10 +482,8 @@ def generate_docx(emails, analyses, overview_text):
     section.right_margin = Cm(1.5)
     section.top_margin = Cm(1.5)
     section.bottom_margin = Cm(1.5)
-
-    # ---------------------------------------------------
+    
     # COVER HEADER
-    # ---------------------------------------------------
     tbl = doc.add_table(rows=3, cols=1)
     tbl.style = "Table Grid"
     set_col_widths(tbl, [Inches(7.0)])
@@ -525,9 +517,7 @@ def generate_docx(emails, analyses, overview_text):
 
     doc.add_paragraph()
 
-    # ---------------------------------------------------
     # KPI SECTION
-    # ---------------------------------------------------
     critical = sum(
         1 for a in analyses
         if a.get("priority") == "Critical"
@@ -581,9 +571,7 @@ def generate_docx(emails, analyses, overview_text):
 
     doc.add_paragraph()
 
-    # ---------------------------------------------------
     # OVERVIEW
-    # ---------------------------------------------------
     h = doc.add_paragraph()
     h.paragraph_format.space_before = Pt(12)
     h.paragraph_format.space_after = Pt(6)
@@ -616,9 +604,7 @@ def generate_docx(emails, analyses, overview_text):
 
     doc.add_paragraph()
 
-    # ---------------------------------------------------
     # EMAIL ANALYSIS
-    # ---------------------------------------------------
     heading = doc.add_paragraph()
     heading.paragraph_format.space_before = Pt(12)
     heading.paragraph_format.space_after = Pt(6)
@@ -837,13 +823,11 @@ def generate_docx(emails, analyses, overview_text):
 
     return output_file
 
-# ---------------------------------------------------
 # LOGIN
-# ---------------------------------------------------
 if "access_token" not in st.session_state:
 
     st.info(
-        "🔓 Login with your Microsoft account to continue"
+        "Login with your Microsoft account to continue"
     )
 
     if st.button("🔐 Login with Microsoft", use_container_width=True):
@@ -860,16 +844,16 @@ if "access_token" not in st.session_state:
 
                 st.stop()
 
-            st.markdown("### 👇 Complete Login")
+            st.markdown("### Complete Login")
 
             st.code(flow["user_code"])
 
             st.markdown(
                 f"""
-Visit: **{flow['verification_uri']}**
+                Visit: **{flow['verification_uri']}**
 
-Enter the code above.
-"""
+                Enter the code above.
+            """
             )
 
             with st.spinner(
@@ -905,9 +889,7 @@ Enter the code above.
 
             st.error(f"❌ {str(e)}")
 
-# ---------------------------------------------------
 # AFTER LOGIN
-# ---------------------------------------------------
 else:
 
     access_token = st.session_state["access_token"]
@@ -916,13 +898,13 @@ else:
 
     with col1:
         generate_btn = st.button(
-            "📄 Generate AI Report",
+            "Generate AI Report",
             use_container_width=True
         )
 
     with col2:
         logout_btn = st.button(
-            "🚪 Logout",
+            "⚠Logout",
             use_container_width=True
         )
 
@@ -937,7 +919,7 @@ else:
         try:
 
             with st.spinner(
-                "📬 Fetching emails..."
+                "Fetching emails..."
             ):
 
                 last_week = (
@@ -1047,9 +1029,7 @@ else:
                 "AI Report Generated Successfully"
             )
 
-            # ---------------------------------------------------
             # LIVE PREVIEW SECTION
-            # ---------------------------------------------------
             st.subheader("Report Preview & Statistics")
 
             kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
