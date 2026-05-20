@@ -35,7 +35,7 @@ groq_client = Groq(
 
 # PAGE CONFIG
 st.set_page_config(
-    page_title="Outlook AI Report Generator",
+    page_title="📧 Outlook AI Report Generator",
     page_icon="⭕",
     layout="wide"
 )
@@ -109,7 +109,7 @@ with st.sidebar:
     for text in features:
         st.markdown(f"{text}", unsafe_allow_html=True)
     st.markdown("---")
-    st.markdown("### 📌 Priority Levels")
+    st.markdown("## Priority Levels")
     st.markdown("🔴 **Critical** — Urgent, high-risk")
     st.markdown("🟠 **High** — Needs prompt action")
     st.markdown("🟢 **Medium** — Standard follow-up")
