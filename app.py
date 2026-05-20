@@ -844,69 +844,37 @@ def generate_docx(emails, analyses, overview_text):
 # ---------------------------------------------------
 # LOGIN
 # ---------------------------------------------------
+# ---------------------------------------------------
+# LOGIN
+# ---------------------------------------------------
 if "access_token" not in st.session_state:
 
-    st.info(
-        "🔓 Login with your Microsoft account to continue"
-    )
+    st.info("🔓 Login with your Microsoft account to continue")
 
     if st.button("🔐 Login with Microsoft", use_container_width=True):
-
         try:
-
-            flow = app.initiate_device_flow(
-                scopes=SCOPES
-            )
+            flow = app.initiate_device_flow(scopes=SCOPES)
 
             if "user_code" not in flow:
-
                 st.error("❌ Device flow failed")
-
                 st.stop()
 
             st.markdown("### 👇 Complete Login")
-
             st.code(flow["user_code"])
+            st.markdown(f"Visit: **{flow['verification_uri']}**\n\nEnter the code above.")
 
-            st.markdown(
-                f"""
-Visit: **{flow['verification_uri']}**
-
-Enter the code above.
-"""
-            )
-
-            with st.spinner(
-                "Waiting for login..."
-            ):
-
-                result = app.acquire_token_by_device_flow(
-                    flow
-                )
+            with st.spinner("Waiting for login..."):
+                result = app.acquire_token_by_device_flow(flow)
 
             if "access_token" in result:
-
-                st.session_state["access_token"] = (
-                    result["access_token"]
-                )
-
-                st.success(
-                    "✅ Login successful"
-                )
-
+                st.session_state["access_token"] = result["access_token"]
+                st.session_state["logged_in"] = True
+                st.success("✅ Login successful")
                 st.rerun()
-
             else:
-
-                st.error(
-                    result.get(
-                        "error_description",
-                        "Login failed"
-                    )
-                )
+                st.error(result.get("error_description", "Login failed"))
 
         except Exception as e:
-
             st.error(f"❌ {str(e)}")
 
 # ---------------------------------------------------
