@@ -36,7 +36,7 @@ groq_client = Groq(
 # PAGE CONFIG
 st.set_page_config(
     page_title="Outlook AI Report Generator",
-    page_icon="📄",
+    page_icon="⭕",
     layout="wide"
 )
 
@@ -93,9 +93,9 @@ st.markdown("""
 
 # SIDEBAR
 with st.sidebar:
-    st.markdown("## 📄 AI Report Generator")
+    st.markdown("## AI Report Generator")
     st.markdown("---")
-    st.markdown("### ✨ Key Features")
+    st.markdown("## Key Features")
     features = [
         ("Fetches last 7 days of emails"),
         ("AI priority classification"),
@@ -117,10 +117,10 @@ with st.sidebar:
     st.markdown("---")
     st.caption("Powered by Groq · Microsoft Graph API")
 
-st.title("📄 Outlook AI Report Generator")
+st.title("Outlook AI Report Generator")
 
 st.write(
-    "🚀 Generate professional AI-powered DOCX reports from your Outlook emails with automatic formatting."
+    "Generate professional AI-powered DOCX reports from your Outlook emails with automatic formatting."
 )
 
 # ---------------------------------------------------
@@ -993,7 +993,7 @@ else:
                 )
 
             st.success(
-                f"✅ {len(emails)} emails fetched"
+                f"{len(emails)} emails fetched"
             )
 
             if not emails:
@@ -1009,7 +1009,7 @@ else:
             progress = st.progress(0)
 
             with st.spinner(
-                "🤖 Analysing emails using AI..."
+                "Analysing emails using AI..."
             ):
 
                 total = len(emails)
@@ -1025,7 +1025,7 @@ else:
                     )
 
             with st.spinner(
-                "🧠 Generating executive overview..."
+                "Generating executive overview..."
             ):
 
                 overview = weekly_overview(
@@ -1034,7 +1034,7 @@ else:
                 )
 
             with st.spinner(
-                "📄 Generating professional DOCX report..."
+                "Generating professional DOCX report..."
             ):
 
                 report_file = generate_docx(
@@ -1044,13 +1044,13 @@ else:
                 )
 
             st.success(
-                "✅ AI Report Generated Successfully"
+                "AI Report Generated Successfully"
             )
 
             # ---------------------------------------------------
             # LIVE PREVIEW SECTION
             # ---------------------------------------------------
-            st.subheader("📊 Report Preview & Statistics")
+            st.subheader("Report Preview & Statistics")
 
             kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
@@ -1092,7 +1092,7 @@ else:
             st.divider()
 
             # Overview
-            st.subheader("📝 Executive Overview")
+            st.subheader("Executive Overview")
             st.info(overview)
 
             st.divider()
@@ -1101,7 +1101,7 @@ else:
             with open(report_file, "rb") as file:
 
                 st.download_button(
-                    label="⬇️ Download DOCX Report",
+                    label="Download DOCX Report",
                     data=file,
                     file_name=report_file,
                     mime=(
