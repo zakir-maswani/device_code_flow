@@ -93,9 +93,9 @@ st.markdown("""
 
 # SIDEBAR
 with st.sidebar:
-    st.markdown("## AI Report Generator")
+    st.markdown("## 𝗔𝗜 𝗥𝗲𝗽𝗼𝗿𝘁 𝗚𝗲𝗻𝗲𝗿𝗮𝘁𝗼𝗿")
     st.markdown("---")
-    st.markdown("## Key Features")
+    st.markdown("## 𝗞𝗲𝘆 𝗙𝗲𝗮𝘁𝘂𝗿𝗲𝘀")
     features = [
         ("★ Fetches last 7 days of emails"),
         ("★ AI priority classification"),
@@ -109,15 +109,15 @@ with st.sidebar:
     for text in features:
         st.markdown(f"{text}", unsafe_allow_html=True)
     st.markdown("---")
-    st.markdown("## Priority Levels")
+    st.markdown("## 𝗣𝗿𝗶𝗼𝗿𝗶𝘁𝘆 𝗟𝗲𝘃𝗲𝗹𝘀")
     st.markdown("᪥ **Critical** ➪ Urgent, high-risk")
     st.markdown("᪥ **High** ➪ Needs prompt action")
     st.markdown("᪥ **Medium** ➪ Standard follow-up")
     st.markdown("᪥ **Low** ➪ Informational only")
     st.markdown("---")
-    st.caption("Powered by Groq · Microsoft Graph API")
+    st.caption("𝙿𝚘𝚠𝚎𝚛𝚎𝚍 𝚋𝚢 𝙶𝚛𝚘𝚚 - 𝙼𝚒𝚌𝚛𝚘𝚜𝚘𝚏𝚝 𝙶𝚛𝚊𝚙𝚑 𝙰𝙿𝙸")
 
-st.title("Outlook AI Report Generator")
+st.title("𝗢𝘂𝘁𝗹𝗼𝗼𝗸 𝗔𝗜 𝗥𝗲𝗽𝗼𝗿𝘁 𝗚𝗲𝗻𝗲𝗿𝗮𝘁𝗼𝗿")
 
 st.write(
     "Generate professional AI-powered DOCX reports from your Outlook emails with automatic formatting."
