@@ -85,41 +85,8 @@ st.markdown("""
         color: #6b7a8e;
         font-weight: bold;
     }
-    .feature-item {
-        padding: 6px 0;
-        font-size: 13px;
-        border-bottom: 1px solid #f0f0f0;
-    }
 </style>
 """, unsafe_allow_html=True)
-
-# ---------------------------------------------------
-# SIDEBAR
-# ---------------------------------------------------
-with st.sidebar:
-    st.markdown("## 📄 AI Report Generator")
-    st.markdown("---")
-    st.markdown("### ✨ Key Features")
-    features = [
-        ("📬", "Fetches last 7 days of emails"),
-        ("🤖", "AI priority classification"),
-        ("📝", "Executive summary per email"),
-        ("⚡", "Action item extraction"),
-        ("📊", "KPI dashboard overview"),
-        ("📁", "Professional DOCX export"),
-        ("🔒", "Secure Microsoft OAuth login"),
-        ("🧠", "AI executive overview"),
-    ]
-    for icon, text in features:
-        st.markdown(f"<div class='feature-item'>{icon} {text}</div>", unsafe_allow_html=True)
-    st.markdown("---")
-    st.markdown("### 📌 Priority Levels")
-    st.markdown("🔴 **Critical** — Urgent, high-risk")
-    st.markdown("🟠 **High** — Needs prompt action")
-    st.markdown("🟢 **Medium** — Standard follow-up")
-    st.markdown("⚪ **Low** — Informational only")
-    st.markdown("---")
-    st.caption("Powered by Groq · Microsoft Graph API")
 
 st.title("📄 Outlook AI Report Generator")
 
@@ -229,6 +196,7 @@ def auto_fit_text(cell, text, base_size=10):
     """Auto-fit text size based on content length"""
     p = cell.paragraphs[0]
     
+    # Calculate appropriate size based on text length
     if len(text) > 200:
         font_size = Pt(8)
     elif len(text) > 100:
@@ -236,6 +204,7 @@ def auto_fit_text(cell, text, base_size=10):
     else:
         font_size = Pt(base_size)
     
+    # Handle text wrapping
     p.word_wrap = True
     run = p.add_run(text)
     run.font.size = font_size
@@ -385,14 +354,17 @@ Rules:
         import re
         import json
 
+        # Remove markdown fences if model adds them
         raw = re.sub(r"```(?:json)?", "", raw).strip()
 
+        # Extract JSON object safely
         match = re.search(r"\{.*\}", raw, re.DOTALL)
         if match:
             raw = match.group(0)
 
         result = json.loads(raw)
 
+        # Ensure all expected fields exist
         defaults = {
             "priority": "Medium",
             "summary": "No summary available.",
@@ -422,7 +394,6 @@ Rules:
             "follow_up_required": False,
             "business_risk": "None"
         }
-
 # ---------------------------------------------------
 # WEEKLY OVERVIEW
 # ---------------------------------------------------
@@ -500,6 +471,7 @@ def generate_docx(emails, analyses, overview_text):
     tbl.style = "Table Grid"
     set_col_widths(tbl, [Inches(7.0)])
 
+    # Header row 1 - Badge
     c0 = tbl.cell(0, 0)
     set_cell_bg(c0, NAVY)
     set_cell_margins(c0, top=100, bottom=60, left=150, right=150)
@@ -508,6 +480,7 @@ def generate_docx(emails, analyses, overview_text):
     r.font.size = Pt(9)
     r.font.color.rgb = BLUE
 
+    # Header row 2 - Title
     c1 = tbl.cell(1, 0)
     set_cell_bg(c1, NAVY)
     set_cell_margins(c1, top=120, bottom=120, left=150, right=150)
@@ -518,6 +491,7 @@ def generate_docx(emails, analyses, overview_text):
     r.font.size = Pt(26)
     r.font.color.rgb = WHITE
 
+    # Header row 3 - Date
     c2 = tbl.cell(2, 0)
     set_cell_bg(c2, NAVY)
     set_cell_margins(c2, top=80, bottom=100, left=150, right=150)
@@ -658,6 +632,7 @@ def generate_docx(emails, analyses, overview_text):
 
         priority = analysis.get("priority", "Medium")
 
+        # Header card
         card = doc.add_table(rows=1, cols=3)
         card.style = "Table Grid"
         set_col_widths(card, [Inches(0.6), Inches(5.4), Inches(1.0)])
@@ -685,6 +660,7 @@ def generate_docx(emails, analyses, overview_text):
 
         priority_badge(c3, priority)
 
+        # Meta table
         meta = doc.add_table(rows=2, cols=4)
         meta.style = "Table Grid"
         set_col_widths(meta, [Inches(1.8), Inches(1.8), Inches(1.6), Inches(1.6)])
@@ -724,6 +700,7 @@ def generate_docx(emails, analyses, overview_text):
             r.font.size = Pt(9)
             r.font.color.rgb = TEXT
 
+        # Body content
         body = doc.add_table(rows=3, cols=2)
         body.style = "Table Grid"
         set_col_widths(body, [Inches(1.7), Inches(5.2)])
@@ -844,37 +821,69 @@ def generate_docx(emails, analyses, overview_text):
 # ---------------------------------------------------
 # LOGIN
 # ---------------------------------------------------
-# ---------------------------------------------------
-# LOGIN
-# ---------------------------------------------------
 if "access_token" not in st.session_state:
 
-    st.info("🔓 Login with your Microsoft account to continue")
+    st.info(
+        "🔓 Login with your Microsoft account to continue"
+    )
 
     if st.button("🔐 Login with Microsoft", use_container_width=True):
+
         try:
-            flow = app.initiate_device_flow(scopes=SCOPES)
+
+            flow = app.initiate_device_flow(
+                scopes=SCOPES
+            )
 
             if "user_code" not in flow:
+
                 st.error("❌ Device flow failed")
+
                 st.stop()
 
             st.markdown("### 👇 Complete Login")
-            st.code(flow["user_code"])
-            st.markdown(f"Visit: **{flow['verification_uri']}**\n\nEnter the code above.")
 
-            with st.spinner("Waiting for login..."):
-                result = app.acquire_token_by_device_flow(flow)
+            st.code(flow["user_code"])
+
+            st.markdown(
+                f"""
+Visit: **{flow['verification_uri']}**
+
+Enter the code above.
+"""
+            )
+
+            with st.spinner(
+                "Waiting for login..."
+            ):
+
+                result = app.acquire_token_by_device_flow(
+                    flow
+                )
 
             if "access_token" in result:
-                st.session_state["access_token"] = result["access_token"]
-                st.session_state["logged_in"] = True
-                st.success("✅ Login successful")
+
+                st.session_state["access_token"] = (
+                    result["access_token"]
+                )
+
+                st.success(
+                    "✅ Login successful"
+                )
+
                 st.rerun()
+
             else:
-                st.error(result.get("error_description", "Login failed"))
+
+                st.error(
+                    result.get(
+                        "error_description",
+                        "Login failed"
+                    )
+                )
 
         except Exception as e:
+
             st.error(f"❌ {str(e)}")
 
 # ---------------------------------------------------
@@ -898,12 +907,14 @@ else:
             use_container_width=True
         )
 
+    # Logout
     if logout_btn:
 
         st.session_state.clear()
 
         st.rerun()
 
+    # Generate Report
     if generate_btn:
 
         try:
@@ -1024,6 +1035,7 @@ else:
             # ---------------------------------------------------
             st.subheader("📊 Report Preview & Statistics")
 
+            # KPI Row
             kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
             with kpi_col1:
@@ -1066,6 +1078,55 @@ else:
             # Overview
             st.subheader("📝 Executive Overview")
             st.info(overview)
+
+            st.divider()
+
+            # Email Preview
+            st.subheader("📩 Top Emails Preview")
+
+            for idx, (email, analysis) in enumerate(zip(emails[:5], analyses[:5]), 1):
+
+                subject = html.escape(
+                    email.get(
+                        "subject",
+                        "No Subject"
+                    )
+                )
+
+                sender = html.escape(
+                    email.get("from", {})
+                    .get("emailAddress", {})
+                    .get("address", "Unknown")
+                )
+
+                summary = analysis.get(
+                    "summary",
+                    ""
+                )
+
+                priority = analysis.get("priority", "Medium")
+                priority_class = f"priority-{priority.lower()}"
+
+                st.markdown(
+                    f"""
+<div class="email-preview">
+    <div style="display: flex; justify-content: space-between; align-items: start;">
+        <div>
+            <h4 style="margin: 0 0 8px 0;">📧 {subject}</h4>
+            <p style="margin: 4px 0; font-size: 13px; color: #666;">
+                <strong>From:</strong> {sender}
+            </p>
+            <p style="margin: 8px 0; font-size: 13px; line-height: 1.5;">
+                <strong>AI Summary:</strong> {summary}
+            </p>
+        </div>
+        <div class="{priority_class}" style="white-space: nowrap; margin-left: 16px;">
+            {priority}
+        </div>
+    </div>
+</div>
+"""
+                    , unsafe_allow_html=True)
 
             st.divider()
 
