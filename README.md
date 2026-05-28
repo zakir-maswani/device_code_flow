@@ -455,10 +455,10 @@ This project is licensed under the MIT License - see LICENSE file for details.
 
 ## 📞 Support & Contact
 
-- 📧 Email: support@yourapp.com
-- 🐛 Bug Reports: [GitHub Issues](https://github.com/yourusername/outlook-ai-report-generator/issues)
-- 💡 Feature Requests: [GitHub Discussions](https://github.com/yourusername/outlook-ai-report-generator/discussions)
-- 🐦 Twitter: [@yourhandle](https://twitter.com/yourhandle)
+- 📧 Email: za1512007@gmail.com
+- 🐛 Bug Reports: [GitHub Issues](https://github.com/zakir-maswani/outlook-ai-report-generator/issues)
+- 💡 Feature Requests: [GitHub Discussions](https://github.com/zakir-maswani/outlook-ai-report-generator/discussions)
+- 🐦 Twitter: [@yourhandle](https://twitter.com/zakir-ali)
 
 ---
 
